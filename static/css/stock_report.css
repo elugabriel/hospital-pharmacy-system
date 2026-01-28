@@ -1,0 +1,31 @@
+.summary-card {
+    border-left: 6px solid #ccc;
+    height: 100%;
+}
+
+.summary-card.expired {
+    border-color: #dc3545;
+}
+
+.summary-card.warning {
+    border-color: #ffc107;
+}
+
+.summary-card.low-stock {
+    border-color: #fd7e14;
+}
+
+.summary-card.value {
+    border-color: #198754;
+}
+
+.summary-card h6 {
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.summary-card h3,
+.summary-card h4 {
+    margin: 0;
+    font-weight: bold;
+}

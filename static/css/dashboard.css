@@ -1,0 +1,92 @@
+:root {
+    --primary: #4361ee;
+    --primary-dark: #3b5bdb;
+    --dark: #1e293b;
+    --gray: #64748b;
+    --glass: rgba(255, 255, 255, 0.45);
+    --border-glass: rgba(255, 255, 255, 0.6);
+    --shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    --shadow-hover: 0 14px 30px rgba(67, 97, 238, 0.25);
+}
+
+body {
+    background: linear-gradient(135deg, #eef2ff, #dbeafe);
+    min-height: 100vh;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    color: var(--dark);
+}
+
+/* ================= HEADER ================= */
+.header {
+    background: linear-gradient(120deg, var(--primary), var(--primary-dark));
+    padding: 2rem 0;
+    color: #ffffff;
+    box-shadow: 0 10px 30px rgba(67, 97, 238, 0.35);
+}
+
+.header h1 {
+    font-size: 2.4rem;
+    font-weight: 700;
+    letter-spacing: -0.8px;
+    margin-bottom: 0.4rem;
+}
+
+.header p {
+    font-size: 1.1rem;
+    opacity: 0.95;
+}
+
+/* ================= DASHBOARD ================= */
+.dashboard-container {
+    padding: 2rem 0;
+}
+
+.module-card {
+    background: var(--glass);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-radius: 18px;
+    border: 1px solid var(--border-glass);
+    box-shadow: var(--shadow);
+    transition: all 0.35s ease;
+    height: 100%;
+}
+
+.module-card:hover {
+    transform: translateY(-6px) scale(1.01);
+    box-shadow: var(--shadow-hover);
+    border-color: rgba(67, 97, 238, 0.45);
+}
+
+.card-body {
+    padding: 1.5rem 1rem;
+    text-align: center;
+}
+
+.card-icon {
+    font-size: 2.6rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.card-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.card-text {
+    font-size: 0.9rem;
+    color: var(--gray);
+}
+
+@media (max-width: 768px) {
+    .header h1 {
+        font-size: 2rem;
+    }
+    .header p {
+        font-size: 1rem;
+    }
+}

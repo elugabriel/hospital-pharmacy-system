@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Receipt</title>
+
+    <!-- POS Receipt CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/receipt.css') }}">
+</head>
+<body>
+
+<div class="center">
+    <strong>HOSPITAL PHARMACY</strong><br>
+    RECEIPT
+</div>
+
+<hr>
+
+<div class="details">
+    <div>Patient: {{ receipt[1] }}</div>
+    <div>Patient ID: {{ receipt[2] }}</div>
+    <div>Date: {{ receipt[7] }}</div>
+</div>
+
+<hr>
+
+<table>
+    {% for item in items %}
+        <tr>
+            <td colspan="2">{{ item[0] }} ({{ item[1] }})</td>
+        </tr>
+        <tr>
+            <td>{{ item[2] }} × {{ item[3] }}</td>
+            <td class="right">{{ item[2] * item[3] }}</td>
+        </tr>
+    {% endfor %}
+</table>
+
+<hr>
+
+<div class="summary">
+    <div>Subtotal: {{ receipt[3] }}</div>
+    <div>Discount: {{ receipt[4] }}</div>
+    <div>Tax: {{ receipt[5] }}</div>
+    <div class="total">Total: {{ receipt[7] }}</div>
+</div>
+
+<hr>
+
+<div class="center">
+    Thank you
+</div>
+
+<button onclick="window.print()">Print</button>
+
+<a href="{{ url_for('pharmacy_dashboard') }}" class="back-link">
+    ← Back to Dashboard
+</a>
+
+</body>
+</html>

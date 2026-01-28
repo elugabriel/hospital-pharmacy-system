@@ -1,0 +1,74 @@
+/* POS Receipt Styling (80mm) */
+
+body {
+    width: 80mm;
+    font-family: monospace;
+    margin: 0 auto;
+    font-size: 12px;
+    color: #000;
+}
+
+.center {
+    text-align: center;
+}
+
+.right {
+    text-align: right;
+}
+
+.details,
+.summary {
+    margin: 6px 0;
+}
+
+.summary div {
+    display: flex;
+    justify-content: space-between;
+}
+
+.total {
+    font-weight: bold;
+    font-size: 13px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+td {
+    padding: 2px 0;
+}
+
+hr {
+    border: none;
+    border-top: 1px dashed #000;
+    margin: 6px 0;
+}
+
+button {
+    width: 100%;
+    margin-top: 10px;
+    padding: 6px;
+    font-size: 12px;
+}
+
+.back-link {
+    display: block;
+    text-align: center;
+    margin-top: 8px;
+    text-decoration: none;
+    font-size: 11px;
+}
+
+/* Print optimization */
+@media print {
+    button,
+    .back-link {
+        display: none;
+    }
+
+    body {
+        margin: 0;
+    }
+}

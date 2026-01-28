@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Receipt Search</title>
+</head>
+<body>
+
+<h3>Search Receipt</h3>
+
+<form method="POST">
+    <input type="text" name="query" placeholder="Patient name or ID" required>
+    <button type="submit">Search</button>
+</form>
+
+<hr>
+
+<table border="1" width="100%">
+    <tr>
+        <th>Date</th>
+        <th>Patient</th>
+        <th>Total</th>
+        <th>Action</th>
+    </tr>
+
+    {% for r in receipts %}
+    <tr>
+        <td>{{ r[3] }}</td>
+        <td>{{ r[1] }} ({{ r[2] }})</td>
+        <td>{{ r[4] }}</td>
+        <td>
+            <a href="/receipt/{{ r[0] }}">Reprint</a>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+</body>
+</html>

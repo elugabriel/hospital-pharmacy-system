@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Drug Sales • {{ hospital_name }}</title>
+
+    <!-- Bootstrap 5 + Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/drug_sales.css') }}">
+</head>
+<body>
+
+    <!-- Fixed Top Bar -->
+    <div class="topbar">
+        <div class="container-fluid d-flex justify-content-between align-items-center px-4">
+            <div class="user-info">
+                <h2>Pharmacy Module</h2>
+                <p>Logged in as <strong>{{ pharmacist_name }}</strong></p>
+                <p id="datetime" class="mb-0" style="font-size:0.9rem; color: var(--gray);"></p>
+            </div>
+            <a href="{{ url_for('pharmacy_dashboard') }}" class="btn btn-secondary me-2">
+                <i class="bi bi-arrow-left-circle me-1"></i>Dashboard
+            </a>
+            <a href="{{ url_for('pharmacy_logout') }}" class="logout-btn btn btn-danger">
+                <i class="bi bi-box-arrow-right me-1"></i>Logout
+            </a>
+        </div>
+    </div>
+
+    <!-- Page Title -->
+    <div class="page-title text-center my-4">
+        <h1>Drug Sales</h1>
+        <span class="badge bg-success"></span>
+    </div>
+
+    <div class="container">
+
+        <!-- Drug Search Panel -->
+            <div class="row mb-4">
+                <div class="col-md-8 position-relative">
+                    <input type="text" class="form-control" id="drug-search" placeholder="Search drug by name...">
+                    <ul id="drug-suggestions" class="list-group position-absolute w-100 d-none" style="z-index: 1000;"></ul>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-primary w-100" id="add-drug-btn">
+                        <i class="bi bi-plus-circle me-1"></i>drug-search
+                    </button>
+                </div>
+            </div>
+
+
+        <!-- Selected Drugs Table -->
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered align-middle" id="cart-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Drug Name</th>
+                        <th>Strength</th>
+                        <th>Unit Price</th>
+                        <th>Quantity</th>
+                        <th>Subtotal</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Dynamic Rows Will Appear Here -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Billing Summary -->
+        <div class="row mt-4">
+            <div class="col-md-6 offset-md-6">
+                <div class="card p-3">
+                    <h5>Billing Summary</h5>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal:</span>
+                        <span id="subtotal">0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Discount:</span>
+                        <input type="number" id="discount" value="0" min="0" class="form-control form-control-sm w-50">
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>VAT/NHIS:</span>
+                        <input type="number" id="tax" value="0" min="0" class="form-control form-control-sm w-50">
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between fw-bold fs-5">
+                        <span>Grand Total:</span>
+                        <span id="grand-total">0.00</span>
+                    </div>
+                    <button class="btn btn-success w-100 mt-3" id="confirm-payment">
+                        <i class="bi bi-cash-stack me-1"></i>Confirm Payment
+                    </button>
+                    <button class="btn btn-outline-secondary w-100 mt-2" id="cancel-sale">
+                        <i class="bi bi-x-circle me-1"></i>Cancel Sale
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/drug_sales.js') }}"></script>
+
+
+    <!-- Date & Time -->
+    <script>
+        function updateDateTime() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const timeString = now.toLocaleTimeString();
+            const dateString = now.toLocaleDateString(undefined, options);
+            document.getElementById('datetime').textContent = `${dateString} • ${timeString}`;
+        }
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+    </script>
+
+</body>
+</html>

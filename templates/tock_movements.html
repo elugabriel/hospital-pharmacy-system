@@ -1,0 +1,28 @@
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Drug</th>
+            <th>Strength</th>
+            <th>Type</th>
+            <th>Quantity</th>
+            <th>User</th>
+            <th>Timestamp</th>
+            <th>Note</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for m in movements %}
+        <tr>
+            <td>{{ m[0] }}</td>
+            <td>{{ m[1] }}</td>
+            <td>{{ m[2] }}</td>
+            <td>{{ m[3] }}</td>
+            <td>{{ m[4] }}</td>
+            <td>{{ m[5] }}</td>
+            <td>{{ m[6] }}</td>
+            <td>{{ m[7] }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
