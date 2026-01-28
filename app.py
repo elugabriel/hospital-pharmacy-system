@@ -3,7 +3,8 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
 import os
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
+from calendar import month_name
 
 
 # -------------------- FLASK APP SETUP --------------------
@@ -339,6 +340,8 @@ def save_patient_info():
     return redirect(url_for('reprint_receipt', receipt_no=receipt_no))
 
 
+import json
+
 @app.route('/pharmacy/receipt/<receipt_no>')
 def reprint_receipt(receipt_no):
     if 'pharmacist_id' not in session:
@@ -347,6 +350,7 @@ def reprint_receipt(receipt_no):
     conn = get_db_connection()
     cur = conn.cursor()
 
+    # Fetch receipt header
     cur.execute("""
         SELECT receipt_no, patient_name, patient_id, items,
                subtotal, discount, tax, grand_total, pharmacist, created_at
@@ -354,30 +358,35 @@ def reprint_receipt(receipt_no):
         WHERE receipt_no = %s
     """, (receipt_no,))
 
-    sale = cur.fetchone()
+    row = cur.fetchone()
     cur.close()
     conn.close()
 
-    if not sale:
+    if not row:
         flash("Receipt not found", "danger")
         return redirect(url_for('pharmacy_dashboard'))
 
+    # Convert row tuple to dict and deserialize items
+    receipt = {
+        "receipt_no": row[0],
+        "patient_name": row[1],
+        "patient_id": row[2],
+        "items": json.loads(row[3]) if row[3] else [],  # <-- deserialize JSON string to list
+        "subtotal": float(row[4]),
+        "discount": float(row[5]),
+        "tax": float(row[6]),
+        "grand_total": float(row[7]),
+        "pharmacist": row[8],
+        "date": row[9].strftime("%Y-%m-%d %H:%M:%S")
+    }
+
     return render_template(
         "receipt.html",
-        receipt={
-            "receipt_no": sale[0],
-            "patient_name": sale[1],
-            "patient_id": sale[2],
-            "items": sale[3],
-            "subtotal": sale[4],
-            "discount": sale[5],
-            "tax": sale[6],
-            "grand_total": sale[7],
-            "date": sale[9].strftime("%Y-%m-%d %H:%M")
-        },
-        pharmacist_name=sale[8],
+        receipt=receipt,
         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State"
     )
+
+
 
 
 @app.route("/receipt_search", methods=["GET", "POST"])
@@ -405,70 +414,159 @@ def receipt_search():
     return render_template("receipt_search.html", receipts=receipts)
 
 
+# @app.route("/pharmacy/confirm-payment", methods=["POST"])
+# def confirm_payment():
+#     data = request.get_json()
+
+#     conn = get_db_connection()
+#     cur = conn.cursor()
+
+#     cur.execute("""
+#         INSERT INTO receipts (
+#             patient_name,
+#             patient_id,
+#             subtotal,
+#             discount,
+#             tax,
+#             total_amount,
+#             grand_total
+#         )
+#         VALUES (%s, %s, %s, %s, %s, %s, %s)
+#         RETURNING id;
+#     """, (
+#         data["patient_name"],
+#         data["patient_id"],
+#         data["subtotal"],
+#         data["discount"],
+#         data["tax"],
+#         data["grand_total"],
+#         data["grand_total"]
+#     ))
+
+#     receipt_id = cur.fetchone()[0]
+
+#     for item in data["items"]:
+#         cur.execute("""
+#             INSERT INTO receipt_items (
+#                 receipt_id,
+#                 drug_name,
+#                 strength,
+#                 quantity,
+#                 unit_price
+#             )
+#             VALUES (%s, %s, %s, %s, %s);
+#         """, (
+#             receipt_id,
+#             item["drug_name"],
+#             item["strength"],
+#             item["quantity"],
+#             item["unit_price"]
+#         ))
+
+#         cur.execute("""
+#             UPDATE drugs
+#             SET stock_quantity = stock_quantity - %s
+#             WHERE name = %s AND strength = %s;
+#         """, (
+#             item["quantity"],
+#             item["drug_name"],
+#             item["strength"]
+#         ))
+
+#     conn.commit()
+#     cur.close()
+#     conn.close()
+
+#     return jsonify({"success": True, "receipt_id": receipt_id})
+
+from flask import jsonify
+from datetime import datetime
+
 @app.route("/pharmacy/confirm-payment", methods=["POST"])
 def confirm_payment():
+    if "pharmacist_id" not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
     data = request.get_json()
 
     conn = get_db_connection()
     cur = conn.cursor()
 
-    cur.execute("""
-        INSERT INTO receipts (
-            patient_name,
-            patient_id,
-            subtotal,
-            discount,
-            tax,
-            total_amount,
-            grand_total
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        RETURNING id;
-    """, (
-        data["patient_name"],
-        data["patient_id"],
-        data["subtotal"],
-        data["discount"],
-        data["tax"],
-        data["grand_total"],
-        data["grand_total"]
-    ))
-
-    receipt_id = cur.fetchone()[0]
-
-    for item in data["items"]:
+    try:
+        # ---------------- INSERT RECEIPT (POSTGRES RETURNING) ----------------
         cur.execute("""
-            INSERT INTO receipt_items (
-                receipt_id,
-                drug_name,
-                strength,
-                quantity,
-                unit_price
+            INSERT INTO receipts (
+                patient_name,
+                patient_id,
+                subtotal,
+                discount,
+                tax,
+                total_amount,
+                grand_total,
+                created_at
             )
-            VALUES (%s, %s, %s, %s, %s);
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id;
         """, (
-            receipt_id,
-            item["drug_name"],
-            item["strength"],
-            item["quantity"],
-            item["unit_price"]
+            data.get("patient_name"),
+            data.get("patient_id"),
+            data["subtotal"],
+            data["discount"],
+            data["tax"],
+            data["grand_total"],
+            data["grand_total"],
+            datetime.now()
         ))
 
-        cur.execute("""
-            UPDATE drugs
-            SET stock_quantity = stock_quantity - %s
-            WHERE name = %s AND strength = %s;
-        """, (
-            item["quantity"],
-            item["drug_name"],
-            item["strength"]
-        ))
+        receipt_id = cur.fetchone()[0]  # ✅ SAFE
 
-    conn.commit()
+        # ---------------- INSERT RECEIPT ITEMS + UPDATE STOCK ----------------
+        for item in data["items"]:
+            # Save sold item
+            cur.execute("""
+                INSERT INTO receipt_items (
+                    receipt_id,
+                    drug_name,
+                    strength,
+                    quantity,
+                    unit_price
+                )
+                VALUES (%s, %s, %s, %s, %s);
+            """, (
+                receipt_id,
+                item["drug_name"],
+                item["strength"],
+                item["quantity"],
+                item["unit_price"]
+            ))
+
+            # Reduce stock
+            cur.execute("""
+                UPDATE drugs
+                SET stock_quantity = stock_quantity - %s,
+                    updated_at = NOW()
+                WHERE name = %s AND strength = %s;
+            """, (
+                item["quantity"],
+                item["drug_name"],
+                item["strength"]
+            ))
+
+        conn.commit()
+
+    except Exception as e:
+        conn.rollback()
+        cur.close()
+        conn.close()
+        return jsonify({"success": False, "error": str(e)}), 500
+
     cur.close()
     conn.close()
 
-    return jsonify({"success": True, "receipt_id": receipt_id})
+    return jsonify({
+        "success": True,
+        "receipt_id": receipt_id
+    })
 
 
 
@@ -498,7 +596,6 @@ def receipt(receipt_id):
 
 @app.route("/pharmacy/receipt/<int:receipt_id>")
 def view_receipt(receipt_id):
-
     if "pharmacist_id" not in session:
         return redirect(url_for("pharmacy_login"))
 
@@ -512,13 +609,24 @@ def view_receipt(receipt_id):
         WHERE id = %s
     """, (receipt_id,))
 
-    receipt = cur.fetchone()
-
-    if not receipt:
+    row = cur.fetchone()
+    if not row:
         cur.close()
         conn.close()
         flash("Receipt not found", "danger")
         return redirect(url_for("pharmacy_dashboard"))
+
+    # Convert to dict
+    receipt = {
+        "id": row[0],
+        "patient_name": row[1],
+        "patient_id": row[2],
+        "subtotal": float(row[3]),
+        "discount": float(row[4]),
+        "tax": float(row[5]),
+        "grand_total": float(row[6]),
+        "date": row[7].strftime("%Y-%m-%d %H:%M:%S")
+    }
 
     # Fetch receipt items
     cur.execute("""
@@ -527,7 +635,15 @@ def view_receipt(receipt_id):
         WHERE receipt_id = %s
     """, (receipt_id,))
 
-    items = cur.fetchall()
+    items_rows = cur.fetchall()
+    items = []
+    for i in items_rows:
+        items.append({
+            "drug_name": i[0],
+            "strength": i[1],
+            "quantity": i[2],
+            "unit_price": float(i[3])
+        })
 
     cur.close()
     conn.close()
@@ -538,6 +654,7 @@ def view_receipt(receipt_id):
         items=items,
         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State"
     )
+
 
 def build_stock_snapshot(rows, today):
     stock = []
@@ -770,6 +887,99 @@ def monthly_valuation():
     conn.close()
 
     return render_template('monthly_valuation.html', monthly_data=monthly_data)
+
+
+
+from calendar import month_name
+
+from datetime import date, datetime, timedelta
+from calendar import month_name
+
+from datetime import date, datetime, timedelta
+from flask import render_template, request, redirect, url_for, session, flash
+
+@app.route("/pharmacy/revenue-report", methods=["GET", "POST"])
+def revenue_report():
+    if 'pharmacist_id' not in session:
+        return redirect(url_for('pharmacy_login'))
+
+    # -----------------------------
+    # Get form inputs
+    # -----------------------------
+    report_type = request.form.get("period", "daily")
+    selected_day = request.form.get("day")
+    selected_month = request.form.get("month")
+    selected_year = request.form.get("year")
+
+    today = date.today()
+
+    # -----------------------------
+    # Compute date range
+    # -----------------------------
+    if report_type == "daily":
+        start_date = end_date = datetime.strptime(selected_day, "%Y-%m-%d").date() if selected_day else today
+
+    elif report_type == "weekly":
+        d = datetime.strptime(selected_day, "%Y-%m-%d").date() if selected_day else today
+        start_date = d - timedelta(days=d.weekday())  # Monday
+        end_date = start_date + timedelta(days=6)     # Sunday
+
+    elif report_type == "monthly":
+        month = int(selected_month) if selected_month else today.month
+        year = int(selected_year) if selected_year else today.year
+        start_date = date(year, month, 1)
+        if month == 12:
+            end_date = date(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            end_date = date(year, month + 1, 1) - timedelta(days=1)
+    else:
+        flash("Invalid report period", "danger")
+        return redirect(url_for("pharmacy_dashboard"))
+
+    # -----------------------------
+    # Fetch sales from DB
+    # -----------------------------
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, patient_name, patient_id, grand_total, created_at
+        FROM receipts
+        WHERE DATE(created_at) BETWEEN %s AND %s
+        ORDER BY created_at ASC;
+    """, (start_date, end_date))
+    sales = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    # -----------------------------
+    # Compute total revenue safely
+    # -----------------------------
+    total_revenue = sum(float(s[3]) if s[3] is not None else 0.0 for s in sales)
+
+    # -----------------------------
+    # Month and year dropdowns
+    # -----------------------------
+    months = [(i, month_name[i]) for i in range(1, 13)]
+    years = range(2024, today.year + 1)
+
+    return render_template(
+        "revenue_report.html",
+        sales=sales,
+        total_revenue=total_revenue,
+        period=report_type,
+        start_date=start_date,
+        end_date=end_date,
+        selected_day=selected_day,
+        selected_month=int(selected_month) if selected_month else today.month,
+        selected_year=int(selected_year) if selected_year else today.year,
+        months=months,
+        years=years
+    )
+
+
+
+
+
 
 
 # -------------------- RUN APP --------------------
