@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Receipt | Billing & Revenue</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/receipt.css') }}">
+</head>
+<body>
+<div class="receipt-wrapper">
+    <h2>{{ hospital_name }}</h2>
+    <h3>Payment Receipt</h3>
+
+    <p><strong>Receipt No:</strong> {{ receipt.id }}</p>
+    <p><strong>Patient Name:</strong> {{ receipt.patient_name }}</p>
+    <p><strong>Service:</strong> {{ receipt.service_type }}</p>
+    <p><strong>Payment Method:</strong> {{ receipt.payment_method }}</p>
+    <p><strong>Date:</strong> {{ receipt.date }}</p>
+
+    <hr>
+
+    <table>
+        <tr><td>Subtotal:</td><td>₦{{ "%.2f"|format(receipt.subtotal) }}</td></tr>
+        <tr><td>Discount:</td><td>₦{{ "%.2f"|format(receipt.discount) }}</td></tr>
+        <tr><td>Tax:</td><td>₦{{ "%.2f"|format(receipt.tax) }}</td></tr>
+        <tr><td><strong>Grand Total:</strong></td><td>₦{{ "%.2f"|format(receipt.grand_total) }}</td></tr>
+        <tr><td><strong>Amount Paid:</strong></td><td>₦{{ "%.2f"|format(receipt.amount_paid) }}</td></tr>
+        <!-- <tr><td><strong>Balance:</strong></td><td>₦{{ "%.2f"|format(receipt.balance) }}</td></tr> -->
+    </table>
+
+    <hr>
+    <p>Thank you for your payment.</p>
+
+    <button onclick="window.print()">Print Receipt</button>
+    <a href="{{ url_for('billing_dashboard') }}">Back to Dashboard</a>
+</div>
+</body>
+</html>

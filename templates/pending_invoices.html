@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pending Invoices</title>
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+
+<h2>Pending Invoices</h2>
+
+{% if invoices %}
+<table border="1" cellpadding="10" cellspacing="0">
+    <thead>
+        <tr>
+            <th>Invoice ID</th>
+            <th>Patient Name</th>
+            <th>Service</th>
+            <th>Amount (₦)</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for inv in invoices %}
+        <tr>
+            <td>{{ inv[0] }}</td>
+            <td>{{ inv[1] }}</td>
+            <td>{{ inv[2] }}</td>
+            <td>{{ inv[3] }}</td>
+            <td>
+                <a href="{{ url_for('accept_payment', invoice_id=inv[0]) }}">
+                    Accept Payment
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No pending invoices.</p>
+{% endif %}
+
+<a href="{{ url_for('billing_dashboard') }}">⬅ Back to Dashboard</a>
+
+</body>
+</html>

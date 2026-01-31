@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing & Revenue Dashboard</title>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/billing_dashboard.css') }}">
+</head>
+<body>
+
+    <!-- ================= TOP BAR ================= -->
+    <header class="topbar">
+        <div class="user-info">
+            <h2>Billing & Revenue</h2>
+            <p>Welcome, {{ session.get('billing_username', 'User') }}</p>
+        </div>
+
+        <a href="{{ url_for('billing_logout') }}" class="logout-btn">
+            <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </a>
+    </header>
+
+    <!-- ================= PAGE TITLE ================= -->
+    <section class="page-title">
+        <h1>Billing & Revenue Dashboard</h1>
+        <span class="badge">Active</span>
+    </section>
+
+    <!-- ================= DASHBOARD CARDS ================= -->
+    <section class="dashboard-cards">
+
+        <!-- THIS IS THE IMPORTANT FIX: The link now points to the correct page -->
+        <a href="{{ url_for('accept_payment_page') }}" class="card-link">
+            <div class="card">
+                <i class="fa-solid fa-credit-card"></i>
+                <h3>Accept Payment</h3>
+                <p>Receive patient payments for services</p>
+            </div>
+        </a>
+
+        <a href="#" class="card-link">
+            <div class="card">
+                <i class="fa-solid fa-money-bill-trend-up"></i>
+                <h3>Today’s Collection</h3>
+                <p>Total amount collected today</p>
+            </div>
+        </a>
+
+        <a href="#" class="card-link">
+            <div class="card">
+                <i class="fa-solid fa-chart-line"></i>
+                <h3>Revenue Report</h3>
+                <p>Daily, weekly & monthly reports</p>
+            </div>
+        </a>
+
+        <a href="#" class="card-link">
+            <div class="card">
+                <i class="fa-solid fa-receipt"></i>
+                <h3>Payment History</h3>
+                <p>All completed transactions</p>
+            </div>
+        </a>
+
+        <a href="#" class="card-link">
+            <div class="card">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <h3>Search Receipt</h3>
+                <p>Find receipt by number or patient</p>
+            </div>
+        </a>
+    </section>
+
+</body>
+</html>

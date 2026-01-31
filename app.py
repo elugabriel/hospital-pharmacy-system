@@ -978,12 +978,404 @@ def revenue_report():
 
 
 
+# ------------------------------------
+#           Billing and Revenue
+# --------------------------------------
+
+def create_default_billing_user():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    hashed_password = generate_password_hash("billing123")
+
+    cur.execute("""
+        INSERT INTO billing_users (username, password)
+        VALUES (%s, %s)
+        ON CONFLICT (username)
+        DO NOTHING
+    """, ("billing1", hashed_password))
+
+    conn.commit()
+    cur.close()
+    conn.close()
 
 
+def create_default_billing_user():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    hashed_password = generate_password_hash("billing123")
+
+    cur.execute("""
+        INSERT INTO billing_users (username, password)
+        VALUES (%s, %s)
+        ON CONFLICT (username)
+        DO NOTHING
+    """, ("billing1", hashed_password))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+@app.route("/billing/login", methods=["GET", "POST"])
+def billing_login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT id, password
+            FROM billing_users
+            WHERE username = %s
+        """, (username,))
+
+        user = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if user and check_password_hash(user[1], password):
+            session["billing_user_id"] = user[0]
+            username = user[1]
+            return redirect(url_for("billing_dashboard"))
+        else:
+            flash("Invalid login credentials", "danger")
+
+    return render_template("billing_login.html")
+
+
+
+@app.route("/billing/dashboard")
+def billing_dashboard():
+    if "billing_user_id" not in session:
+        return redirect(url_for("billing_login"))
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT id, patient_name, service_type, amount
+    FROM billing_invoice
+    WHERE status = 'UNPAID'
+    ORDER BY id DESC
+    """)
+
+
+    invoices = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template(
+        "billing_dashboard.html",
+        invoices=invoices
+    )
+
+
+
+@app.route("/billing/logout")
+def billing_logout():
+    session.pop("billing_user_id", None)
+    flash("Logged out successfully", "success")
+    return redirect(url_for("billing_login"))
+
+@app.route("/billing/accept-payment/<int:invoice_id>", methods=["POST"])
+def accept_payment(invoice_id):
+    """
+    Directly process payment for a billing invoice.
+    Expects POST data: amount_paid, payment_method
+    """
+    if "billing_user_id" not in session:
+        flash("Unauthorized access. Please login.", "danger")
+        return redirect(url_for("billing_login"))
+
+    amount_paid = request.form.get("amount_paid")
+    payment_method = request.form.get("payment_method")
+
+    if not amount_paid or not payment_method:
+        flash("Payment amount and method are required.", "danger")
+        return redirect(url_for("billing_dashboard"))
+
+    try:
+        amount_paid = float(amount_paid)
+    except ValueError:
+        flash("Invalid payment amount.", "danger")
+        return redirect(url_for("billing_dashboard"))
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        # Get invoice total
+        cur.execute("""
+            SELECT amount, status
+            FROM billing_invoice
+            WHERE id = %s
+        """, (invoice_id,))
+        invoice = cur.fetchone()
+
+        if not invoice:
+            flash("Invoice not found.", "danger")
+            return redirect(url_for("billing_dashboard"))
+
+        total_due, status = invoice
+        if status == "PAID":
+            flash("Invoice already paid.", "warning")
+            return redirect(url_for("billing_dashboard"))
+
+        # Compute balance and status
+        balance = total_due - amount_paid
+        payment_status = "Paid" if balance <= 0 else "Partial"
+
+        # Insert payment record
+        cur.execute("""
+            INSERT INTO billing_receipt (
+                invoice_id,
+                amount_paid,
+                payment_method,
+                received_by,
+                payment_date
+            )
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            invoice_id,
+            amount_paid,
+            payment_method,
+            session.get("billing_username"),
+            datetime.now()
+        ))
+
+        # Update invoice status
+        new_status = "PAID" if balance <= 0 else "PARTIAL"
+        cur.execute("""
+            UPDATE billing_invoice
+            SET status = %s
+            WHERE id = %s
+        """, (new_status, invoice_id))
+
+        conn.commit()
+        flash(f"Payment recorded successfully. Balance: ₦{balance:.2f}", "success")
+
+    except Exception as e:
+        conn.rollback()
+        flash(f"Payment error: {e}", "danger")
+
+    finally:
+        cur.close()
+        conn.close()
+
+    return redirect(url_for("billing_dashboard"))
+
+
+# ---------------------------
+# Optional helper: billing_confirm_payment
+# ---------------------------
+# If you want to keep a generic endpoint for form submission
+@app.route("/billing/confirm-payment", methods=["POST"])
+def billing_confirm_payment():
+    """
+    Wrapper endpoint: takes POST form data and calls accept_payment
+    directly using invoice_id from the form.
+    """
+    if "billing_user_id" not in session:
+        flash("Unauthorized access.", "danger")
+        return redirect(url_for("billing_login"))
+
+    invoice_id = request.form.get("invoice_id")
+    if not invoice_id:
+        flash("Invoice ID is required.", "danger")
+        return redirect(url_for("billing_dashboard"))
+
+    # Directly call accept_payment logic
+    return accept_payment(int(invoice_id))
+
+
+
+@app.route("/billing/confirm-payment", methods=["POST"])
+def billing_confirm_payment():
+    if "billing_user_id" not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    # -------------------------
+    # Get form data
+    # -------------------------
+    patient_name = request.form.get("patient_name")
+    service_type = request.form.get("service_type")
+    amount_due = request.form.get("amount_due")
+    receipt_date = request.form.get("receipt_date")
+    payment_method = request.form.get("payment_method")
+    amount_paid = request.form.get("amount_paid")
+
+    # -------------------------
+    # Validation
+    # -------------------------
+    if not all([patient_name, service_type, amount_due, receipt_date, payment_method, amount_paid]):
+        flash("All fields are required.", "danger")
+        return redirect(url_for("accept_payment"))
+
+    try:
+        amount_due = float(amount_due)
+        amount_paid = float(amount_paid)
+        payment_date = datetime.strptime(receipt_date, "%Y-%m-%d").date()
+    except ValueError:
+        flash("Invalid amount or date format.", "danger")
+        return redirect(url_for("accept_payment"))
+
+    # -------------------------
+    # Financial Computation
+    # -------------------------
+    subtotal = amount_due
+    discount = 0.0
+    tax = 0.0
+    grand_total = subtotal - discount + tax
+    balance = grand_total - amount_paid
+
+    status = "Paid" if balance <= 0 else "Partial"
+
+    # -------------------------
+    # Persist to PostgreSQL
+    # -------------------------
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+            INSERT INTO payments (
+                patient_name,
+                service_type,
+                subtotal,
+                discount,
+                tax,
+                grand_total,
+                amount_paid,
+                balance,
+                payment_method,
+                status,
+                payment_date,
+                recorded_by
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id;
+        """, (
+            patient_name,
+            service_type,
+            subtotal,
+            discount,
+            tax,
+            grand_total,
+            amount_paid,
+            balance,
+            payment_method,
+            status,
+            payment_date,
+            session["billing_user_id"]
+        ))
+
+        payment_id = cur.fetchone()[0]
+        conn.commit()
+
+        flash(f"Payment recorded successfully. Receipt No: {payment_id}", "success")
+
+    except Exception as e:
+        conn.rollback()
+        flash(f"Payment error: {e}", "danger")
+
+    finally:
+        cur.close()
+        conn.close()
+
+    return redirect(url_for("billing_dashboard"))
+
+def billing_receipt(receipt_id):
+
+    conn = psycopg2.connect(...)
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT patient_name, service_type, payment_method,
+               subtotal, discount, tax, grand_total, receipt_date
+        FROM billing_receipts
+        WHERE id = %s
+    """, (receipt_id,))
+
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    receipt = {
+        "patient_name": row[0],
+        "service_type": row[1],
+        "payment_method": row[2],
+        "subtotal": row[3],
+        "discount": row[4],
+        "tax": row[5],
+        "grand_total": row[6],
+        "date": row[7]
+    }
+
+    return render_template("billing_receipt.html", receipt=receipt)
+
+def get_invoice_by_id(invoice_id):
+    conn = psycopg2.connect(...)
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT id, patient_name, service_type, amount
+        FROM invoices
+        WHERE id = %s
+    """, (invoice_id,))
+
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if not row:
+        return None
+
+    return {
+        "id": row[0],
+        "patient_name": row[1],
+        "service_type": row[2],
+        "amount": row[3]
+    }
+
+@app.route("/billing/accept-payment", methods=["GET"])
+def accept_payment_page():
+    return render_template("accept_payment.html")
+
+
+@app.route("/billing/pending-invoices")
+def pending_invoices():
+    if "billing_user_id" not in session:
+        return redirect(url_for("billing_login"))
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT id, patient_name, service_type, amount
+        FROM billing_invoice
+        WHERE status = 'UNPAID'
+        ORDER BY id DESC
+    """)
+
+    invoices = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return render_template(
+        "pending_invoices.html",
+        invoices=invoices
+    )
 
 
 # -------------------- RUN APP --------------------
 if __name__ == "__main__":
     create_pharmacists_table()
     create_default_pharmacist()
+    create_default_billing_user()   # <-- add this line
     app.run(debug=True)
+
