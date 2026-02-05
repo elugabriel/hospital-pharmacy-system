@@ -1957,13 +1957,13 @@ def hr_login():
                          hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")    
 
 
-@app.route("/hr/scheduling")
-def scheduling():
-    if "hr_user_id" not in session:
-        return redirect(url_for("hr_login"))
-    return render_template("module_placeholder.html", 
-                         module_name="Scheduling",
-                         description="Create and manage work schedules and shifts")
+# @app.route("/hr/scheduling")
+# def scheduling():
+#     if "hr_user_id" not in session:
+#         return redirect(url_for("hr_login"))
+#     return render_template("module_placeholder.html", 
+#                          module_name="Scheduling",
+#                          description="Create and manage work schedules and shifts")
 
 @app.route("/hr/leave-management")
 def leave_management():
@@ -2512,6 +2512,750 @@ def edit_staff(staff_id):
                          departments=departments,
                          hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
 
+
+# ==================== ROUTES: SCHEDULING MODULE ====================
+
+@app.route("/hr/scheduling")
+def scheduling():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get current month schedules
+        current_month = date.today().replace(day=1)
+        if current_month.month == 12:
+            next_month = current_month.replace(year=current_month.year + 1, month=1)
+        else:
+            next_month = current_month.replace(month=current_month.month + 1)
+        
+        cur.execute("""
+            SELECT s.*, st.first_name, st.last_name, st.position, d.name as department_name
+            FROM schedules s
+            JOIN staff st ON s.staff_id = st.id
+            LEFT JOIN departments d ON st.department_id = d.id
+            WHERE s.schedule_date >= %s AND s.schedule_date < %s
+            ORDER BY s.schedule_date, s.start_time
+        """, (current_month, next_month))
+        
+        schedules = cur.fetchall()
+        
+        # Get statistics
+        cur.execute("SELECT COUNT(*) FROM schedules WHERE schedule_date >= CURRENT_DATE")
+        upcoming_shifts = cur.fetchone()[0] or 0
+        
+        cur.execute("""
+            SELECT COUNT(DISTINCT staff_id) 
+            FROM schedules 
+            WHERE schedule_date >= CURRENT_DATE
+        """)
+        staff_scheduled = cur.fetchone()[0] or 0
+        
+        # Get departments for filter
+        cur.execute("SELECT id, name FROM departments WHERE status = 'Active' ORDER BY name")
+        departments = cur.fetchall()
+        
+        # Get staff for filter
+        cur.execute("""
+            SELECT id, first_name, last_name, position 
+            FROM staff 
+            WHERE status = 'Active' 
+            ORDER BY first_name, last_name
+        """)
+        staff_list = cur.fetchall()
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching scheduling data: {e}")
+        schedules = []
+        upcoming_shifts = 0
+        staff_scheduled = 0
+        departments = []
+        staff_list = []
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template("scheduling_dashboard.html",
+                         schedules=schedules,
+                         upcoming_shifts=upcoming_shifts,
+                         staff_scheduled=staff_scheduled,
+                         departments=departments,
+                         staff_list=staff_list,
+                         current_month=current_month.strftime("%B %Y"),
+                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+    
+    
+@app.route("/hr/scheduling/create", methods=["GET", "POST"])
+def create_schedule():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    if request.method == "POST":
+        staff_id = request.form.get("staff_id")
+        schedule_date = request.form.get("schedule_date")
+        shift_type = request.form.get("shift_type")
+        start_time = request.form.get("start_time")
+        end_time = request.form.get("end_time")
+        location = request.form.get("location")
+        notes = request.form.get("notes")
+        
+        if not all([staff_id, schedule_date, start_time, end_time]):
+            flash("Please fill in all required fields", "danger")
+            return redirect(url_for("create_schedule"))
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        try:
+            # Check for existing schedule for same staff on same date
+            cur.execute("""
+                SELECT id FROM schedules 
+                WHERE staff_id = %s AND schedule_date = %s
+            """, (staff_id, schedule_date))
+            
+            if cur.fetchone():
+                flash("This staff already has a schedule for this date", "warning")
+                return redirect(url_for("create_schedule"))
+            
+            # Insert new schedule
+            cur.execute("""
+                INSERT INTO schedules (
+                    staff_id, schedule_date, shift_type, 
+                    start_time, end_time, location, notes
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (staff_id, schedule_date, shift_type, start_time, end_time, location, notes))
+            
+            conn.commit()
+            flash("Schedule created successfully!", "success")
+            return redirect(url_for("scheduling"))
+            
+        except Exception as e:
+            conn.rollback()
+            app.logger.error(f"Error creating schedule: {e}")
+            flash(f"Error creating schedule: {str(e)}", "danger")
+            return redirect(url_for("create_schedule"))
+            
+        finally:
+            cur.close()
+            conn.close()
+    
+    # GET request - show form
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get active staff
+        cur.execute("""
+            SELECT id, first_name, last_name, position, 
+                   (SELECT name FROM departments WHERE id = staff.department_id) as department
+            FROM staff 
+            WHERE status = 'Active' 
+            ORDER BY first_name, last_name
+        """)
+        staff_list = cur.fetchall()
+        
+        # Get default tomorrow's date
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        
+    except Exception as e:
+        app.logger.error(f"Error loading schedule form data: {e}")
+        staff_list = []
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template("create_schedule.html",
+                         staff_list=staff_list,
+                         tomorrow=tomorrow,
+                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+
+@app.route("/hr/scheduling/roster")
+def view_roster():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    # Get filter parameters
+    department_id = request.args.get("department_id", "")
+    staff_id = request.args.get("staff_id", "")
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
+    
+    # Default to current week if no dates specified
+    if not start_date:
+        today = date.today()
+        start_date = (today - timedelta(days=today.weekday())).strftime("%Y-%m-%d")
+    
+    if not end_date:
+        start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end_date = (start_date_obj + timedelta(days=6)).strftime("%Y-%m-%d")
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Build query with filters
+        query = """
+            SELECT 
+                s.id as schedule_id,
+                s.schedule_date,
+                s.shift_type,
+                s.start_time,
+                s.end_time,
+                s.location,
+                s.notes,
+                st.id as staff_id,
+                st.first_name,
+                st.last_name,
+                st.position,
+                d.name as department_name,
+                d.id as department_id
+            FROM schedules s
+            JOIN staff st ON s.staff_id = st.id
+            LEFT JOIN departments d ON st.department_id = d.id
+            WHERE s.schedule_date BETWEEN %s AND %s
+        """
+        params = [start_date, end_date]
+        
+        if department_id:
+            query += " AND st.department_id = %s"
+            params.append(department_id)
+        
+        if staff_id:
+            query += " AND s.staff_id = %s"
+            params.append(staff_id)
+        
+        query += " ORDER BY s.schedule_date, d.name, st.first_name, s.start_time"
+        
+        cur.execute(query, params)
+        schedules = cur.fetchall()
+        
+        # Get departments for filter dropdown
+        cur.execute("SELECT id, name FROM departments WHERE status = 'Active' ORDER BY name")
+        departments = cur.fetchall()
+        
+        # Get staff for filter dropdown
+        cur.execute("""
+            SELECT id, first_name, last_name 
+            FROM staff 
+            WHERE status = 'Active' 
+            ORDER BY first_name, last_name
+        """)
+        staff_list = cur.fetchall()
+        
+        # Group schedules by date for calendar view - FIXED: Use tuple indices
+        schedule_dict = {}
+        for schedule in schedules:
+            schedule_date = schedule[1].strftime("%Y-%m-%d")
+            if schedule_date not in schedule_dict:
+                schedule_dict[schedule_date] = []
+            
+            schedule_dict[schedule_date].append({
+                'id': schedule[0],
+                'date': schedule[1],
+                'shift_type': schedule[2],
+                'start_time': schedule[3],
+                'end_time': schedule[4],
+                'location': schedule[5],
+                'notes': schedule[6],
+                'staff_id': schedule[7],
+                'first_name': schedule[8],
+                'last_name': schedule[9],
+                'position': schedule[10],
+                'department': schedule[11]
+            })
+        
+        # Calculate statistics
+        total_shifts = len(schedules)
+        unique_staff = len(set([s[7] for s in schedules]))
+        unique_departments = len(set([s[11] for s in schedules if s[11]]))
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching roster: {e}")
+        schedules = []
+        departments = []
+        staff_list = []
+        schedule_dict = {}
+        total_shifts = 0
+        unique_staff = 0
+        unique_departments = 0
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template("view_roster.html",
+                         schedules=schedules,
+                         schedule_dict=schedule_dict,
+                         departments=departments,
+                         staff_list=staff_list,
+                         start_date=start_date,
+                         end_date=end_date,
+                         selected_department=department_id,
+                         selected_staff=staff_id,
+                         total_shifts=total_shifts,
+                         unique_staff=unique_staff,
+                         unique_departments=unique_departments,
+                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+@app.route("/hr/scheduling/shift-swap", methods=["GET", "POST"])
+def shift_swap():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    if request.method == "POST":
+        action = request.form.get("action")
+        
+        if action == "request":
+            # Request shift swap
+            from_staff_id = request.form.get("from_staff_id")
+            to_staff_id = request.form.get("to_staff_id")
+            schedule_id = request.form.get("schedule_id")
+            reason = request.form.get("reason")
+            
+            try:
+                # Get schedule details
+                cur.execute("""
+                    SELECT schedule_date, start_time, end_time, shift_type 
+                    FROM schedules 
+                    WHERE id = %s
+                """, (schedule_id,))
+                schedule = cur.fetchone()
+                
+                if not schedule:
+                    flash("Schedule not found", "danger")
+                    return redirect(url_for("shift_swap"))
+                
+                # Check if staff is available on that date
+                cur.execute("""
+                    SELECT id FROM schedules 
+                    WHERE staff_id = %s AND schedule_date = %s
+                """, (to_staff_id, schedule[0]))
+                
+                if cur.fetchone():
+                    flash("Selected staff already has a schedule on this date", "warning")
+                    return redirect(url_for("shift_swap"))
+                
+                # Create shift swap request (you'll need to create this table)
+                cur.execute("""
+                    INSERT INTO shift_swap_requests (
+                        schedule_id, from_staff_id, to_staff_id, 
+                        reason, status, requested_by, requested_at
+                    ) VALUES (%s, %s, %s, %s, 'Pending', %s, NOW())
+                """, (schedule_id, from_staff_id, to_staff_id, reason, session["hr_user_id"]))
+                
+                conn.commit()
+                flash("Shift swap request submitted successfully!", "success")
+                
+            except Exception as e:
+                conn.rollback()
+                app.logger.error(f"Error creating shift swap request: {e}")
+                flash(f"Error: {str(e)}", "danger")
+        
+        elif action == "approve":
+            # Approve shift swap
+            swap_id = request.form.get("swap_id")
+            
+            try:
+                # Get swap request details
+                cur.execute("""
+                    SELECT schedule_id, from_staff_id, to_staff_id 
+                    FROM shift_swap_requests 
+                    WHERE id = %s AND status = 'Pending'
+                """, (swap_id,))
+                
+                swap_request = cur.fetchone()
+                if not swap_request:
+                    flash("Swap request not found or already processed", "warning")
+                    return redirect(url_for("shift_swap"))
+                
+                # Update schedule with new staff
+                cur.execute("""
+                    UPDATE schedules 
+                    SET staff_id = %s 
+                    WHERE id = %s
+                """, (swap_request[2], swap_request[0]))
+                
+                # Update swap request status
+                cur.execute("""
+                    UPDATE shift_swap_requests 
+                    SET status = 'Approved', 
+                        approved_by = %s, 
+                        approved_at = NOW() 
+                    WHERE id = %s
+                """, (session["hr_user_id"], swap_id))
+                
+                conn.commit()
+                flash("Shift swap approved successfully!", "success")
+                
+            except Exception as e:
+                conn.rollback()
+                app.logger.error(f"Error approving shift swap: {e}")
+                flash(f"Error: {str(e)}", "danger")
+        
+        elif action == "reject":
+            # Reject shift swap
+            swap_id = request.form.get("swap_id")
+            rejection_reason = request.form.get("rejection_reason")
+            
+            try:
+                cur.execute("""
+                    UPDATE shift_swap_requests 
+                    SET status = 'Rejected', 
+                        rejection_reason = %s,
+                        reviewed_by = %s, 
+                        reviewed_at = NOW() 
+                    WHERE id = %s
+                """, (rejection_reason, session["hr_user_id"], swap_id))
+                
+                conn.commit()
+                flash("Shift swap request rejected", "info")
+                
+            except Exception as e:
+                conn.rollback()
+                app.logger.error(f"Error rejecting shift swap: {e}")
+                flash(f"Error: {str(e)}", "danger")
+    
+    # GET request - show shift swap page
+    try:
+        # Get pending shift swap requests
+        cur.execute("""
+            SELECT ssr.*, 
+                   s1.first_name as from_first_name, s1.last_name as from_last_name,
+                   s2.first_name as to_first_name, s2.last_name as to_last_name,
+                   sch.schedule_date, sch.start_time, sch.end_time
+            FROM shift_swap_requests ssr
+            JOIN schedules sch ON ssr.schedule_id = sch.id
+            JOIN staff s1 ON ssr.from_staff_id = s1.id
+            JOIN staff s2 ON ssr.to_staff_id = s2.id
+            WHERE ssr.status = 'Pending'
+            ORDER BY ssr.requested_at DESC
+        """)
+        pending_swaps = cur.fetchall()
+        
+        # Get upcoming schedules for current staff
+        cur.execute("""
+            SELECT sch.id, sch.schedule_date, sch.start_time, sch.end_time,
+                   st.first_name, st.last_name, st.position
+            FROM schedules sch
+            JOIN staff st ON sch.staff_id = st.id
+            WHERE sch.schedule_date >= CURRENT_DATE
+            ORDER BY sch.schedule_date, sch.start_time
+            LIMIT 50
+        """)
+        upcoming_schedules = cur.fetchall()
+        
+        # Get available staff for swaps
+        cur.execute("""
+            SELECT id, first_name, last_name, position 
+            FROM staff 
+            WHERE status = 'Active' 
+            ORDER BY first_name, last_name
+        """)
+        staff_list = cur.fetchall()
+        
+    except Exception as e:
+        app.logger.error(f"Error loading shift swap data: {e}")
+        pending_swaps = []
+        upcoming_schedules = []
+        staff_list = []
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template("shift_swap.html",
+                         pending_swaps=pending_swaps,
+                         upcoming_schedules=upcoming_schedules,
+                         staff_list=staff_list,
+                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+
+@app.route("/hr/scheduling/reports")
+def schedule_reports():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    # Get report parameters
+    report_type = request.args.get("report_type", "monthly")
+    month = request.args.get("month", date.today().month)
+    year = request.args.get("year", date.today().year)
+    department_id = request.args.get("department_id", "")
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Build report query based on report type
+        if report_type == "monthly":
+            start_date = date(int(year), int(month), 1)
+            if int(month) == 12:
+                end_date = date(int(year) + 1, 1, 1) - timedelta(days=1)
+            else:
+                end_date = date(int(year), int(month) + 1, 1) - timedelta(days=1)
+            
+            query = """
+                SELECT 
+                    d.name as department,
+                    st.first_name || ' ' || st.last_name as staff_name,
+                    COUNT(*) as total_shifts,
+                    SUM(EXTRACT(EPOCH FROM (end_time - start_time))/3600) as total_hours,
+                    COUNT(DISTINCT sch.schedule_date) as days_scheduled
+                FROM schedules sch
+                JOIN staff st ON sch.staff_id = st.id
+                LEFT JOIN departments d ON st.department_id = d.id
+                WHERE sch.schedule_date BETWEEN %s AND %s
+            """
+            params = [start_date, end_date]
+            
+            if department_id:
+                query += " AND st.department_id = %s"
+                params.append(department_id)
+            
+            query += """
+                GROUP BY d.name, st.first_name, st.last_name
+                ORDER BY d.name, staff_name
+            """
+            
+        elif report_type == "weekly":
+            # Get current week
+            today = date.today()
+            start_date = today - timedelta(days=today.weekday())
+            end_date = start_date + timedelta(days=6)
+            
+            query = """
+                SELECT 
+                    sch.schedule_date,
+                    d.name as department,
+                    st.first_name || ' ' || st.last_name as staff_name,
+                    sch.shift_type,
+                    sch.start_time,
+                    sch.end_time,
+                    EXTRACT(EPOCH FROM (sch.end_time - sch.start_time))/3600 as hours
+                FROM schedules sch
+                JOIN staff st ON sch.staff_id = st.id
+                LEFT JOIN departments d ON st.department_id = d.id
+                WHERE sch.schedule_date BETWEEN %s AND %s
+            """
+            params = [start_date, end_date]
+            
+            if department_id:
+                query += " AND st.department_id = %s"
+                params.append(department_id)
+            
+            query += " ORDER BY sch.schedule_date, sch.start_time"
+            
+        elif report_type == "coverage":
+            start_date = date(int(year), int(month), 1)
+            if int(month) == 12:
+                end_date = date(int(year) + 1, 1, 1) - timedelta(days=1)
+            else:
+                end_date = date(int(year), int(month) + 1, 1) - timedelta(days=1)
+            
+            query = """
+                SELECT 
+                    sch.schedule_date,
+                    COUNT(DISTINCT sch.staff_id) as staff_count,
+                    STRING_AGG(st.first_name || ' ' || st.last_name, ', ') as staff_names
+                FROM schedules sch
+                JOIN staff st ON sch.staff_id = st.id
+                WHERE sch.schedule_date BETWEEN %s AND %s
+            """
+            params = [start_date, end_date]
+            
+            if department_id:
+                query += " AND st.department_id = %s"
+                params.append(department_id)
+            
+            query += """
+                GROUP BY sch.schedule_date
+                ORDER BY sch.schedule_date
+            """
+        
+        cur.execute(query, params)
+        report_data = cur.fetchall()
+        
+        # Get departments for filter
+        cur.execute("SELECT id, name FROM departments WHERE status = 'Active' ORDER BY name")
+        departments = cur.fetchall()
+        
+        # Get months and years for filter
+        months = [(i, month_name[i]) for i in range(1, 13)]
+        years = range(date.today().year - 5, date.today().year + 1)
+        
+    except Exception as e:
+        app.logger.error(f"Error generating schedule report: {e}")
+        report_data = []
+        departments = []
+        months = [(i, month_name[i]) for i in range(1, 13)]
+        years = range(date.today().year - 5, date.today().year + 1)
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template("schedule_reports.html",
+                         report_data=report_data,
+                         report_type=report_type,
+                         departments=departments,
+                         months=months,
+                         years=years,
+                         selected_month=int(month),
+                         selected_year=int(year),
+                         selected_department=department_id,
+                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+
+# Route to delete schedule
+@app.route("/hr/scheduling/delete/<int:schedule_id>", methods=["POST"])
+def delete_schedule(schedule_id):
+    if "hr_user_id" not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("DELETE FROM schedules WHERE id = %s", (schedule_id,))
+        conn.commit()
+        return jsonify({"success": True, "message": "Schedule deleted successfully"})
+        
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f"Error deleting schedule: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+        
+    finally:
+        cur.close()
+        conn.close()
+        
+# ==================== ROUTES: SCHEDULING MODULE ====================
+
+# @app.route("/hr/scheduling")
+# def scheduling():
+#     if "hr_user_id" not in session:
+#         return redirect(url_for("hr_login"))
+    
+#     conn = get_db_connection()
+#     cur = conn.cursor()
+    
+#     try:
+#         # Get current month schedules
+#         current_month = date.today().replace(day=1)
+#         if current_month.month == 12:
+#             next_month = current_month.replace(year=current_month.year + 1, month=1)
+#         else:
+#             next_month = current_month.replace(month=current_month.month + 1)
+        
+#         cur.execute("""
+#             SELECT s.*, st.first_name, st.last_name, st.position, d.name as department_name
+#             FROM schedules s
+#             JOIN staff st ON s.staff_id = st.id
+#             LEFT JOIN departments d ON st.department_id = d.id
+#             WHERE s.schedule_date >= %s AND s.schedule_date < %s
+#             ORDER BY s.schedule_date, s.start_time
+#         """, (current_month, next_month))
+        
+#         schedules = cur.fetchall()
+        
+#         # Get statistics
+#         cur.execute("SELECT COUNT(*) FROM schedules WHERE schedule_date >= CURRENT_DATE")
+#         upcoming_shifts = cur.fetchone()[0] or 0
+        
+#         cur.execute("""
+#             SELECT COUNT(DISTINCT staff_id) 
+#             FROM schedules 
+#             WHERE schedule_date >= CURRENT_DATE
+#         """)
+#         staff_scheduled = cur.fetchone()[0] or 0
+        
+#         # Get departments for filter
+#         cur.execute("SELECT id, name FROM departments WHERE status = 'Active' ORDER BY name")
+#         departments = cur.fetchall()
+        
+#         # Get staff for filter
+#         cur.execute("""
+#             SELECT id, first_name, last_name, position 
+#             FROM staff 
+#             WHERE status = 'Active' 
+#             ORDER BY first_name, last_name
+#         """)
+#         staff_list = cur.fetchall()
+        
+#     except Exception as e:
+#         app.logger.error(f"Error fetching scheduling data: {e}")
+#         schedules = []
+#         upcoming_shifts = 0
+#         staff_scheduled = 0
+#         departments = []
+#         staff_list = []
+    
+#     finally:
+#         cur.close()
+#         conn.close()
+    
+#     return render_template("scheduling_dashboard.html",
+#                          schedules=schedules,
+#                          upcoming_shifts=upcoming_shifts,
+#                          staff_scheduled=staff_scheduled,
+#                          departments=departments,
+#                          staff_list=staff_list,
+#                          current_month=current_month.strftime("%B %Y"),
+#                          hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+
+
+
+
+
+
+
+
+
+@app.route("/hr/scheduling/check-availability", methods=["POST"])
+def check_availability():
+    """AJAX endpoint to check staff availability"""
+    if "hr_user_id" not in session:
+        return jsonify({"available": False, "message": "Unauthorized"}), 401
+    
+    data = request.json
+    staff_id = data.get("staff_id")
+    schedule_date = data.get("schedule_date")
+    start_time = data.get("start_time")
+    end_time = data.get("end_time")
+    
+    if not all([staff_id, schedule_date, start_time, end_time]):
+        return jsonify({"available": False, "message": "Missing parameters"}), 400
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            SELECT id FROM schedules 
+            WHERE staff_id = %s 
+            AND schedule_date = %s
+            AND NOT (%s <= start_time OR %s >= end_time)
+        """, (staff_id, schedule_date, end_time, start_time))
+        
+        conflict = cur.fetchone()
+        available = conflict is None
+        
+        return jsonify({
+            "available": available,
+            "message": "Available" if available else "Staff has a conflicting schedule"
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error checking availability: {e}")
+        return jsonify({"available": False, "message": str(e)}), 500
+        
+    finally:
+        cur.close()
+        conn.close()
 # -------------------- RUN APP --------------------
 if __name__ == "__main__":
     create_tables()  # Your existing tables

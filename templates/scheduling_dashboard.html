@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scheduling Dashboard | {{ hospital_name }}</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <!-- Bootstrap Datepicker -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css">
+    
+    <style>
+        :root {
+            --primary: #4361ee;
+            --primary-light: #e0e7ff;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #06b6d4;
+            --dark: #1e293b;
+            --light: #f8fafc;
+        }
+        
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        
+        .scheduling-header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        
+        .module-card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s, box-shadow 0.3s;
+            margin-bottom: 1.5rem;
+            background: white;
+        }
+        
+        .module-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(67, 97, 238, 0.15);
+        }
+        
+        .module-icon {
+            width: 70px;
+            height: 70px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            font-size: 1.8rem;
+            color: white;
+        }
+        
+        .icon-create { background: linear-gradient(135deg, var(--success), #0ca678); }
+        .icon-roster { background: linear-gradient(135deg, var(--primary), var(--secondary)); }
+        .icon-swap { background: linear-gradient(135deg, var(--warning), #f08c00); }
+        .icon-reports { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+        
+        .schedule-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .schedule-item {
+            border-left: 4px solid var(--primary);
+            padding: 1rem;
+            margin-bottom: 0.8rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: all 0.2s;
+        }
+        
+        .schedule-item:hover {
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        
+        .schedule-item.shift-morning { border-left-color: var(--success); }
+        .schedule-item.shift-afternoon { border-left-color: var(--warning); }
+        .schedule-item.shift-night { border-left-color: var(--secondary); }
+        .schedule-item.shift-emergency { border-left-color: var(--danger); }
+        
+        .time-badge {
+            background: var(--primary-light);
+            color: var(--primary);
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .shift-type-badge {
+            background: var(--info);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .btn-action {
+            border-radius: 10px;
+            padding: 0.6rem 1.5rem;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: none;
+            transition: all 0.3s;
+        }
+        
+        .btn-action:hover {
+            transform: translateY(-2px);
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            line-height: 1;
+        }
+        
+        .quick-stats {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('hr_dashboard') }}">
+                <i class="fas fa-arrow-left me-2 text-primary"></i>
+                <strong>{{ hospital_name }}</strong> | HR
+            </a>
+            <div class="d-flex align-items-center">
+                <span class="me-3 text-muted">
+                    <i class="fas fa-user me-1"></i>
+                    {{ session.get('hr_full_name', 'HR User') }}
+                </span>
+                <a href="{{ url_for('hr_logout') }}" class="btn btn-outline-danger btn-sm">
+                    <i class="fas fa-sign-out-alt"></i>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="container mt-3">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                <i class="fas fa-{{ 'check-circle' if category == 'success' else 'exclamation-circle' if category == 'warning' else 'info-circle' }} me-2"></i>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Header -->
+    <div class="scheduling-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="display-5 fw-bold mb-3">
+                        <i class="fas fa-calendar-alt me-3"></i>Scheduling Module
+                    </h1>
+                    <p class="lead mb-0">Manage work schedules, shifts, and staff roster efficiently</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="quick-stats d-inline-block text-dark text-start p-3">
+                        <small class="text-muted d-block">Upcoming Shifts</small>
+                        <div class="stat-number">{{ upcoming_shifts }}</div>
+                        <small class="text-muted">{{ staff_scheduled }} staff scheduled</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container py-4">
+        
+        <!-- Quick Access Cards -->
+        <div class="row mb-5">
+            <div class="col-md-3">
+                <a href="{{ url_for('create_schedule') }}" class="text-decoration-none">
+                    <div class="module-card h-100">
+                        <div class="card-body text-center">
+                            <div class="module-icon icon-create mx-auto">
+                                <i class="fas fa-plus"></i>
+                            </div>
+                            <h4 class="card-title mb-2">Create Schedule</h4>
+                            <p class="card-text text-muted">Add new shifts and assign staff</p>
+                            <span class="btn btn-outline-success btn-sm">Go to Module</span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-3">
+                <a href="{{ url_for('view_roster') }}" class="text-decoration-none">
+                    <div class="module-card h-100">
+                        <div class="card-body text-center">
+                            <div class="module-icon icon-roster mx-auto">
+                                <i class="fas fa-list-alt"></i>
+                            </div>
+                            <h4 class="card-title mb-2">View Roster</h4>
+                            <p class="card-text text-muted">View and manage staff roster</p>
+                            <span class="btn btn-outline-primary btn-sm">View Roster</span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-3">
+                <a href="{{ url_for('shift_swap') }}" class="text-decoration-none">
+                    <div class="module-card h-100">
+                        <div class="card-body text-center">
+                            <div class="module-icon icon-swap mx-auto">
+                                <i class="fas fa-exchange-alt"></i>
+                            </div>
+                            <h4 class="card-title mb-2">Shift Swap</h4>
+                            <p class="card-text text-muted">Manage shift swap requests</p>
+                            <span class="btn btn-outline-warning btn-sm">Manage Swaps</span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="col-md-3">
+                <a href="{{ url_for('schedule_reports') }}" class="text-decoration-none">
+                    <div class="module-card h-100">
+                        <div class="card-body text-center">
+                            <div class="module-icon icon-reports mx-auto">
+                                <i class="fas fa-chart-bar"></i>
+                            </div>
+                            <h4 class="card-title mb-2">Schedule Reports</h4>
+                            <p class="card-text text-muted">Generate scheduling reports</p>
+                            <span class="btn btn-outline-purple btn-sm">View Reports</span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Current Month Schedules -->
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card module-card">
+                    <div class="card-header bg-white border-0 pt-4 d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-calendar-day me-2 text-primary"></i>
+                            {{ current_month }} Schedules
+                        </h4>
+                        <a href="{{ url_for('create_schedule') }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus me-1"></i> New Schedule
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        <div class="schedule-list">
+                            {% if schedules %}
+                                {% for schedule in schedules %}
+                                <div class="schedule-item shift-{{ schedule[3].lower() if schedule[3] else 'morning' }}">
+                                    <div class="row align-items-center">
+                                        <div class="col-md-3">
+                                            <strong class="d-block">{{ schedule[2].strftime('%a, %b %d') }}</strong>
+                                            <div class="time-badge mt-1">
+                                                {{ schedule[4].strftime('%I:%M %p') }} - {{ schedule[5].strftime('%I:%M %p') }}
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong>{{ schedule[8] }} {{ schedule[9] }}</strong>
+                                            <small class="d-block text-muted">{{ schedule[10] }}</small>
+                                            {% if schedule[11] %}
+                                            <small class="d-block">
+                                                <i class="fas fa-building me-1"></i>{{ schedule[11] }}
+                                            </small>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-3">
+                                            {% if schedule[3] %}
+                                            <span class="shift-type-badge">{{ schedule[3] }}</span>
+                                            {% endif %}
+                                            {% if schedule[6] %}
+                                            <div class="mt-1">
+                                                <small class="text-muted">{{ schedule[6] }}</small>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-2 text-end">
+                                            <button class="btn btn-sm btn-outline-danger delete-schedule" 
+                                                    data-id="{{ schedule[0] }}"
+                                                    title="Delete Schedule">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="text-center py-5">
+                                    <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                                    <p class="text-muted">No schedules for {{ current_month }}</p>
+                                    <a href="{{ url_for('create_schedule') }}" class="btn btn-primary">
+                                        <i class="fas fa-plus me-2"></i>Create First Schedule
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <!-- Quick Actions -->
+                <div class="card module-card mb-4">
+                    <div class="card-header bg-white border-0 pt-4">
+                        <h5 class="mb-0">
+                            <i class="fas fa-bolt me-2 text-warning"></i>
+                            Quick Actions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('create_schedule') }}" class="btn btn-primary btn-action">
+                                <i class="fas fa-plus-circle"></i> Create New Schedule
+                            </a>
+                            <a href="{{ url_for('view_roster') }}" class="btn btn-outline-primary btn-action">
+                                <i class="fas fa-calendar-week"></i> View Weekly Roster
+                            </a>
+                            <a href="{{ url_for('shift_swap') }}" class="btn btn-outline-warning btn-action">
+                                <i class="fas fa-exchange-alt"></i> Check Swap Requests
+                            </a>
+                            <a href="{{ url_for('schedule_reports') }}" class="btn btn-outline-success btn-action">
+                                <i class="fas fa-file-export"></i> Export Reports
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Statistics -->
+                <div class="card module-card">
+                    <div class="card-header bg-white border-0 pt-4">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie me-2 text-info"></i>
+                            This Month Stats
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <small class="text-muted d-block">Total Shifts</small>
+                            <div class="d-flex align-items-center">
+                                <div class="stat-number">{{ schedules|length }}</div>
+                                <div class="ms-auto">
+                                    <span class="badge bg-success">Active</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted d-block">Staff Coverage</small>
+                            <div class="progress" style="height: 10px;">
+                                {% set coverage = (staff_scheduled / departments|length * 10)|round|int if departments and departments|length > 0 else 0 %}
+                                <div class="progress-bar bg-primary" style="width: {{ coverage }}%"></div>
+                            </div>
+                            <small class="text-muted">{{ coverage }}% coverage rate</small>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted d-block">Shift Distribution</small>
+                            <div class="d-flex justify-content-between small">
+                                <span>Morning: 45%</span>
+                                <span>Afternoon: 30%</span>
+                                <span>Night: 25%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <script>
+        // Delete schedule functionality
+        $(document).on('click', '.delete-schedule', function() {
+            const scheduleId = $(this).data('id');
+            const staffName = $(this).closest('.schedule-item').find('strong').first().text();
+            
+            if (confirm(`Are you sure you want to delete the schedule for ${staffName}?`)) {
+                $.ajax({
+                    url: '/hr/scheduling/delete/' + scheduleId,
+                    type: 'POST',
+                    success: function(response) {
+                        if (response.success) {
+                            alert('Schedule deleted successfully');
+                            location.reload();
+                        } else {
+                            alert('Error: ' + response.message);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        alert('Error deleting schedule: ' + error);
+                    }
+                });
+            }
+        });
+        
+        // Auto-close flash messages after 5 seconds
+        setTimeout(function() {
+            $('.alert').alert('close');
+        }, 5000);
+    </script>
+</body>
+</html>
