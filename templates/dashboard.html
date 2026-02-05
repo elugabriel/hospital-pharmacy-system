@@ -40,6 +40,10 @@
                 <a href="{{ url_for('billing_login') }}"
                    class="text-decoration-none text-reset">
 
+            {% elif 'human' in module.lower() %}
+                <a href="{{ url_for('hr_login') }}"
+                   class="text-decoration-none text-reset">
+
             {% else %}
                 <a href="{{ url_for('module_placeholder',
                         module_name=module.replace(' ', '_').lower()) }}"

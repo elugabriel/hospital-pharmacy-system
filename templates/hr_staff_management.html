@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ module_name }} | HR Dashboard</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    
+    <!-- Custom CSS (use same as hr_dashboard) -->
+    <style>
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3b5bdb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #06b6d4;
+            --purple: #8b5cf6;
+            --pink: #ec4899;
+            --dark: #1e293b;
+            --gray: #64748b;
+            --light: #f8fafc;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            color: var(--dark);
+            padding-top: 120px;
+            margin: 0;
+        }
+
+        .topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+            padding: 1rem 2rem;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .user-info h2 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin: 0;
+            color: var(--primary);
+        }
+
+        .user-info p {
+            margin: 0;
+            font-size: 0.95rem;
+            color: var(--gray);
+        }
+
+        .logout-btn {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+            color: #fff;
+            padding: 0.6rem 1.4rem;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+            color: white;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .page-header h1 {
+            margin: 0;
+            color: var(--primary);
+            font-size: 2rem;
+        }
+
+        .back-btn {
+            background: var(--primary);
+            color: white;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s;
+        }
+
+        .back-btn:hover {
+            background: var(--primary-dark);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-info {
+            background: var(--info);
+            color: white;
+        }
+
+        /* Staff Table */
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--primary);
+            color: white;
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        td {
+            padding: 1rem;
+        }
+
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+
+        .status-inactive {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-sm {
+            padding: 0.3rem 0.8rem;
+            font-size: 0.85rem;
+            border-radius: 6px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--gray);
+        }
+
+        @media (max-width: 768px) {
+            body { padding-top: 140px; }
+            .page-header { flex-direction: column; align-items: flex-start; }
+            table { display: block; overflow-x: auto; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ================= TOP BAR ================= -->
+    <header class="topbar">
+        <div class="user-info">
+            <h2>Human Resources</h2>
+            <p>Welcome, {{ session.get('hr_full_name', 'HR Manager') }}</p>
+        </div>
+
+        <a href="{{ url_for('hr_logout') }}" class="logout-btn">
+            <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </a>
+    </header>
+
+    <div class="container">
+        
+        <!-- Page Header -->
+        <div class="page-header">
+            <div>
+                <h1><i class="fa-solid fa-user-tie me-2"></i> {{ module_name }}</h1>
+                <p>{{ description }}</p>
+            </div>
+            
+            <div class="action-buttons">
+                <a href="{{ url_for('hr_dashboard') }}" class="back-btn">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+                </a>
+                <a href="{{ url_for('add_staff') }}" class="btn btn-primary">
+                    <i class="fa-solid fa-user-plus"></i> Add New Staff
+                </a>
+            </div>
+        </div>
+
+        <!-- Staff Table -->
+        <div class="table-container">
+            {% if staff_list %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Staff ID</th>
+                            <th>Name</th>
+                            <th>Position</th>
+                            <th>Department</th>
+                            <th>Contact</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for staff in staff_list %}
+                            <tr>
+                                <td><strong>{{ staff[1] }}</strong></td>
+                                <td>{{ staff[2] }} {{ staff[3] }}</td>
+                                <td>{{ staff[4] }}</td>
+                                <td>{{ staff[8] or 'Not Assigned' }}</td>
+                                <td>
+                                    <div>{{ staff[5] or 'No email' }}</div>
+                                    <small>{{ staff[6] or 'No phone' }}</small>
+                                </td>
+                                <td>
+                                    {% if staff[7] == 'Active' %}
+                                        <span class="status-active">
+                                            <i class="fa-solid fa-circle-check me-1"></i> Active
+                                        </span>
+                                    {% else %}
+                                        <span class="status-inactive">
+                                            <i class="fa-solid fa-circle-xmark me-1"></i> Inactive
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="action-btns">
+                                        <a href="#" class="btn btn-sm btn-primary">
+                                            <i class="fa-solid fa-eye"></i> View
+                                        </a>
+                                        <a href="#" class="btn btn-sm btn-info">
+                                            <i class="fa-solid fa-edit"></i> Edit
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-users fa-3x mb-3" style="color: #bdc3c7;"></i>
+                    <h3>No Staff Members Found</h3>
+                    <p>Add your first staff member to get started.</p>
+                    <a href="{{ url_for('add_staff') }}" class="btn btn-primary mt-2">
+                        <i class="fa-solid fa-user-plus"></i> Add Staff
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Dashboard | {{ hospital_name }}</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3b5bdb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #06b6d4;
+            --purple: #8b5cf6;
+            --dark: #1e293b;
+            --gray: #64748b;
+            --light: #f8fafc;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            color: var(--dark);
+            padding-top: 120px;
+            margin: 0;
+        }
+        
+        .topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            padding: 1rem 2rem;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        .user-info h2 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin: 0;
+            color: var(--primary);
+        }
+        
+        .user-info p {
+            margin: 0;
+            font-size: 0.95rem;
+            color: var(--gray);
+        }
+        
+        .logout-btn {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+            color: #fff;
+            padding: 0.6rem 1.4rem;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        
+        .page-title {
+            text-align: center;
+            margin: 2rem 0 3rem;
+        }
+        
+        .page-title h1 {
+            font-size: 2.8rem;
+            font-weight: 700;
+            background: linear-gradient(120deg, var(--primary), var(--primary-dark));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .dashboard-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.8rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+        
+        .card-link {
+            text-decoration: none;
+            color: inherit;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(14px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.4s;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+        }
+        
+        .card-link:hover .card {
+            transform: translateY(-12px) scale(1.03);
+            box-shadow: 0 20px 40px rgba(67, 97, 238, 0.25);
+        }
+        
+        .card i {
+            font-size: 3.2rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .card h3 {
+            font-size: 1.5rem;
+            margin: 0.5rem 0;
+        }
+        
+        .card p {
+            font-size: 0.95rem;
+            color: var(--gray);
+            margin: 0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto 3rem;
+            padding: 0 1rem;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+        
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        }
+        
+        .stat-info h3 {
+            margin: 0;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+        
+        .stat-info p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: var(--gray);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ================= TOP BAR ================= -->
+    <header class="topbar">
+        <div class="user-info">
+            <h2>Human Resources</h2>
+            <p>Welcome, {{ session.get('hr_full_name', 'HR Manager') }} | {{ hospital_name }}</p>
+        </div>
+
+        <a href="{{ url_for('hr_logout') }}" class="logout-btn">
+            <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </a>
+    </header>
+
+    <!-- ================= PAGE TITLE ================= -->
+    <section class="page-title">
+        <h1>Human Resources Dashboard</h1>
+        <span style="background: var(--success); padding: 0.5em 1em; border-radius: 50px; color: white;">
+            <i class="fa-solid fa-circle-check me-1"></i> Active
+        </span>
+    </section>
+
+    <!-- ================= STATS SECTION ================= -->
+    <section class="stats-section">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>{{ total_staff }}</h3>
+                    <p>Total Staff</p>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, var(--success), #0ca678);">
+                    <i class="fa-solid fa-user-check"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>{{ active_staff }}</h3>
+                    <p>Active Today</p>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, var(--warning), #f08c00);">
+                    <i class="fa-solid fa-umbrella-beach"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>{{ on_leave }}</h3>
+                    <p>On Leave</p>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, var(--purple), #7c3aed);">
+                    <i class="fa-solid fa-building"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>{{ departments_count }}</h3>
+                    <p>Departments</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= DASHBOARD CARDS ================= -->
+    <section class="dashboard-cards">
+        
+        <!-- Staff Management -->
+        <a href="{{ url_for('staff_management') }}" class="card-link">
+            <div class="card">
+                <i class="fa-solid fa-user-tie"></i>
+                <h3>Staff Management</h3>
+                <p>Add, edit, and manage staff profiles</p>
+            </div>
+        </a>
+
+        <!-- Scheduling -->
+        <a href="#" class="card-link">
+            <div class="card">
+                <i class="fa-solid fa-calendar-alt"></i>
+                <h3>Scheduling</h3>
+                <p>Manage work schedules and shifts</p>
+            </div>
+        </a>
+
+        <!-- Leave Management -->
+        <a href="#" class="card-link">
+            <div class="card">
+                <i class="fa-solid fa-calendar-check"></i>
+                <h3>Leave Management</h3>
+                <p>Approve and track leave requests</p>
+            </div>
+        </a>
+
+        <!-- Attendance Record -->
+        <a href="#" class="card-link">
+            <div class="card">
+                <i class="fa-solid fa-clipboard-check"></i>
+                <h3>Attendance Record</h3>
+                <p>Track attendance and punctuality</p>
+            </div>
+        </a>
+
+        <!-- Departments -->
+        <a href="#" class="card-link">
+            <div class="card">
+                <i class="fa-solid fa-sitemap"></i>
+                <h3>Departments</h3>
+                <p>Manage departments and reporting structure</p>
+            </div>
+        </a>
+
+        <!-- Reports -->
+        <a href="#" class="card-link">
+            <div class="card">
+                <i class="fa-solid fa-chart-bar"></i>
+                <h3>Reports</h3>
+                <p>Generate HR analytics and reports</p>
+            </div>
+        </a>
+
+    </section>
+
+    <footer style="text-align: center; padding: 2rem; color: var(--gray); font-size: 0.9rem;">
+        <p>Human Resources Management System | {{ hospital_name }}</p>
+        <p>© {{ current_year }} | Version 1.0.0</p>
+    </footer>
+
+    <script>
+        // Set current year in footer
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentYear = new Date().getFullYear();
+            document.querySelector('footer p:last-child').innerHTML = 
+                `© ${currentYear} | Version 1.0.0`;
+        });
+    </script>
+
+</body>
+</html>

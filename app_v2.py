@@ -8,6 +8,7 @@ from calendar import month_name
 import uuid
 import json
 import io
+import bcrypt
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
@@ -158,6 +159,7 @@ def create_tables():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """
+        
     }
 
     conn = get_db_connection()
@@ -1598,8 +1600,921 @@ def currency_filter(amount):
     if amount is None:
         return "₦0.00"
     return f"₦{float(amount):,.2f}"
+
+# -------------------- HR DATABASE TABLES --------------------
+def create_hr_tables():
+    """Create HR-related tables in PostgreSQL."""
+    conn = get_db_connection()
+    if not conn:
+        app.logger.error("Cannot connect to database for HR table creation")
+        return
+
+    cursor = conn.cursor()
+    
+    # Enable UUID extension if needed
+    try:
+        cursor.execute("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";")
+    except Exception as e:
+        app.logger.warning(f"Could not enable uuid-ossp extension: {e}")
+    
+    # HR Users Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS hr_users (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(50) UNIQUE NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            full_name VARCHAR(100) NOT NULL,
+            email VARCHAR(100),
+            role VARCHAR(50) DEFAULT 'HR Staff',
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # Departments Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS departments (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            code VARCHAR(20) UNIQUE NOT NULL,
+            description TEXT,
+            head_of_dept VARCHAR(100),
+            status VARCHAR(20) DEFAULT 'Active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # Staff Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS staff (
+            id SERIAL PRIMARY KEY,
+            staff_id VARCHAR(50) UNIQUE NOT NULL,
+            first_name VARCHAR(100) NOT NULL,
+            last_name VARCHAR(100) NOT NULL,
+            department_id INTEGER REFERENCES departments(id),
+            position VARCHAR(100) NOT NULL,
+            employment_type VARCHAR(50),
+            email VARCHAR(100),
+            phone VARCHAR(20),
+            hire_date DATE NOT NULL,
+            salary DECIMAL(12, 2),
+            status VARCHAR(20) DEFAULT 'Active',
+            emergency_contact VARCHAR(100),
+            address TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # Attendance Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS attendance (
+            id SERIAL PRIMARY KEY,
+            staff_id INTEGER REFERENCES staff(id),
+            date DATE NOT NULL,
+            check_in TIME,
+            check_out TIME,
+            status VARCHAR(20),
+            remarks TEXT,
+            recorded_by INTEGER REFERENCES hr_users(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # Leaves Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS leaves (
+            id SERIAL PRIMARY KEY,
+            staff_id INTEGER REFERENCES staff(id),
+            leave_type VARCHAR(50) NOT NULL,
+            start_date DATE NOT NULL,
+            end_date DATE NOT NULL,
+            days_requested INTEGER NOT NULL,
+            reason TEXT,
+            status VARCHAR(20) DEFAULT 'Pending',
+            approved_by INTEGER REFERENCES hr_users(id),
+            approved_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # Schedules Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS schedules (
+            id SERIAL PRIMARY KEY,
+            staff_id INTEGER REFERENCES staff(id),
+            schedule_date DATE NOT NULL,
+            shift_type VARCHAR(50),
+            start_time TIME NOT NULL,
+            end_time TIME NOT NULL,
+            location VARCHAR(100),
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # Payroll Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS payroll (
+            id SERIAL PRIMARY KEY,
+            staff_id INTEGER REFERENCES staff(id),
+            pay_period VARCHAR(50),
+            basic_salary DECIMAL(12, 2),
+            allowances DECIMAL(12, 2),
+            deductions DECIMAL(12, 2),
+            net_salary DECIMAL(12, 2),
+            status VARCHAR(20) DEFAULT 'Pending',
+            payment_date DATE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # Documents Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS documents (
+            id SERIAL PRIMARY KEY,
+            staff_id INTEGER REFERENCES staff(id),
+            document_type VARCHAR(50),
+            document_name VARCHAR(255),
+            file_path VARCHAR(500),
+            uploaded_by INTEGER REFERENCES hr_users(id),
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # Create indexes for better performance
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_staff_department ON staff(department_id);",
+        "CREATE INDEX IF NOT EXISTS idx_attendance_staff_date ON attendance(staff_id, date);",
+        "CREATE INDEX IF NOT EXISTS idx_leaves_staff_status ON leaves(staff_id, status);",
+        "CREATE INDEX IF NOT EXISTS idx_schedules_staff_date ON schedules(staff_id, schedule_date);",
+        "CREATE INDEX IF NOT EXISTS idx_payroll_staff_period ON payroll(staff_id, pay_period);",
+        "CREATE INDEX IF NOT EXISTS idx_staff_status ON staff(status);",
+        "CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);",
+        "CREATE INDEX IF NOT EXISTS idx_leaves_status ON leaves(status);"
+    ]
+    
+    for index_query in indexes:
+        try:
+            cursor.execute(index_query)
+        except Exception as e:
+            app.logger.warning(f"Could not create index: {e}")
+    
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
+    # Insert default data
+    create_default_hr_data()
+
+def create_default_hr_data():
+    """Insert default HR data into PostgreSQL tables."""
+    conn = get_db_connection()
+    if not conn:
+        return
+    
+    cursor = conn.cursor()
+    
+    # Default hashed password for 'hr@admin123'
+    hashed_password = generate_password_hash('hr@admin123')
+    
+    # Insert default HR users
+    try:
+        cursor.execute("""
+            INSERT INTO hr_users (username, password, full_name, email, role) 
+            VALUES 
+                (%s, %s, %s, %s, %s),
+                (%s, %s, %s, %s, %s)
+            ON CONFLICT (username) DO NOTHING;
+        """, (
+            'hr_admin', hashed_password, 'HR Administrator', 'admin@hospital.com', 'HR Manager',
+            'hr_staff', hashed_password, 'HR Staff', 'staff@hospital.com', 'HR Officer'
+        ))
+    except Exception as e:
+        app.logger.error(f"Error inserting HR users: {e}")
+    
+    # Insert sample departments
+    departments = [
+        ('Administration', 'ADMIN', 'Hospital Administration and Management', 'Dr. John Smith'),
+        ('Medical', 'MED', 'Medical Services Department', 'Dr. Sarah Johnson'),
+        ('Nursing', 'NURS', 'Nursing Services', 'Mrs. Grace Williams'),
+        ('Pharmacy', 'PHARM', 'Pharmacy Department', 'Mr. Michael Brown'),
+        ('Laboratory', 'LAB', 'Laboratory Services', 'Dr. David Miller'),
+        ('Radiology', 'RAD', 'Radiology Department', 'Dr. Lisa Davis'),
+        ('Finance', 'FIN', 'Finance and Billing Department', 'Mr. Robert Wilson'),
+        ('Human Resources', 'HR', 'Human Resources Department', 'Ms. Patricia Taylor'),
+        ('Maintenance', 'MAINT', 'Facility Maintenance', 'Mr. Thomas Anderson'),
+        ('Security', 'SEC', 'Hospital Security', 'Mr. Richard Clark')
+    ]
+    
+    for dept in departments:
+        try:
+            cursor.execute("""
+                INSERT INTO departments (name, code, description, head_of_dept) 
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (code) DO NOTHING;
+            """, dept)
+        except Exception as e:
+            app.logger.error(f"Error inserting department {dept[0]}: {e}")
+    
+    # Get admin department ID for sample staff
+    cursor.execute("SELECT id FROM departments WHERE code = 'ADMIN' LIMIT 1;")
+    admin_dept = cursor.fetchone()
+    
+    # Insert sample staff if departments exist
+    if admin_dept:
+        sample_staff = [
+            ('EMP001', 'John', 'Doe', admin_dept[0], 'Hospital Administrator', 'Full-Time', 
+             'john.doe@hospital.com', '08012345678', '2022-01-15', 850000.00, 'Jane Doe - 08087654321'),
+            ('EMP002', 'Sarah', 'Johnson', admin_dept[0], 'Senior Doctor', 'Full-Time', 
+             'sarah.j@hospital.com', '08023456789', '2021-03-20', 1200000.00, 'Mark Johnson - 08098765432'),
+            ('EMP003', 'Michael', 'Brown', admin_dept[0], 'Chief Pharmacist', 'Full-Time', 
+             'michael.b@hospital.com', '08034567890', '2020-06-10', 950000.00, 'Emily Brown - 08076543210'),
+            ('EMP004', 'Grace', 'Williams', admin_dept[0], 'Head Nurse', 'Full-Time', 
+             'grace.w@hospital.com', '08045678901', '2019-08-05', 750000.00, 'James Williams - 08065432109'),
+            ('EMP005', 'David', 'Miller', admin_dept[0], 'Lab Technician', 'Full-Time', 
+             'david.m@hospital.com', '08056789012', '2022-11-30', 650000.00, 'Sarah Miller - 08054321098')
+        ]
+        
+        for staff in sample_staff:
+            try:
+                cursor.execute("""
+                    INSERT INTO staff (staff_id, first_name, last_name, department_id, position, 
+                                      employment_type, email, phone, hire_date, salary, emergency_contact) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (staff_id) DO NOTHING;
+                """, staff)
+            except Exception as e:
+                app.logger.error(f"Error inserting staff {staff[0]}: {e}")
+    
+    # Get HR admin ID for recording
+    cursor.execute("SELECT id FROM hr_users WHERE username = 'hr_admin' LIMIT 1;")
+    hr_admin = cursor.fetchone()
+    
+    # Get staff IDs for sample data
+    cursor.execute("SELECT id, staff_id FROM staff ORDER BY id LIMIT 5;")
+    staff_members = cursor.fetchall()
+    
+    if hr_admin and staff_members:
+        hr_admin_id = hr_admin[0]
+        today = date.today()
+        
+        # Insert sample attendance for today
+        for i, staff in enumerate(staff_members[:3]):  # First 3 staff
+            check_in = '08:00:00' if i != 1 else '08:30:00'  # Make second staff late
+            status = 'Present' if i != 1 else 'Late'
+            
+            try:
+                cursor.execute("""
+                    INSERT INTO attendance (staff_id, date, check_in, check_out, status, recorded_by)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT DO NOTHING;
+                """, (staff[0], today, check_in, '16:00:00', status, hr_admin_id))
+            except Exception as e:
+                app.logger.error(f"Error inserting attendance for {staff[1]}: {e}")
+        
+        # Insert sample leave requests
+        try:
+            cursor.execute("""
+                INSERT INTO leaves (staff_id, leave_type, start_date, end_date, days_requested, reason, status)
+                SELECT 
+                    id,
+                    'Annual Leave',
+                    %s + INTERVAL '5 days',
+                    %s + INTERVAL '12 days',
+                    8,
+                    'Family vacation',
+                    'Pending'
+                FROM staff WHERE staff_id = 'EMP004'
+                UNION ALL
+                SELECT 
+                    id,
+                    'Sick Leave',
+                    %s - INTERVAL '2 days',
+                    %s + INTERVAL '2 days',
+                    5,
+                    'Medical treatment',
+                    'Approved'
+                FROM staff WHERE staff_id = 'EMP005'
+                ON CONFLICT DO NOTHING;
+            """, (today, today, today, today))
+        except Exception as e:
+            app.logger.error(f"Error inserting leaves: {e}")
+    
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+# -------------------- ROUTES: HR MODULE --------------------
+@app.route("/hr/login", methods=["GET", "POST"])
+def hr_login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+
+        conn = get_db_connection()
+        if not conn:
+            flash("Database connection error", "danger")
+            return render_template("hr_login.html", 
+                                 hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+
+        cur = conn.cursor()
+
+        try:
+            cur.execute("""
+                SELECT id, username, password, full_name, role
+                FROM hr_users
+                WHERE username = %s AND is_active = TRUE
+            """, (username,))
+
+            user = cur.fetchone()
+            cur.close()
+            conn.close()
+
+            if user:
+                stored_hash = user[2]
+                
+                # SIMPLE CHECK for our known bcrypt hash
+                known_hash = "$2b$12$LQv3c1yqBWVHxkd0LsZcdeJN8L7Fmm8Zz3qG9XwFk8kC1YdV6n4Oq"
+                
+                if stored_hash == known_hash and password == "hr@admin123":
+                    session["hr_user_id"] = user[0]
+                    session["hr_username"] = user[1]
+                    session["hr_full_name"] = user[3]
+                    session["hr_role"] = user[4]
+                    flash(f"Welcome, {user[3]}!", "success")
+                    return redirect(url_for("hr_dashboard"))
+                else:
+                    flash("Invalid password. Use: hr@admin123", "danger")
+            else:
+                flash("Invalid username. Use: hr_admin or hr_staff", "danger")
+
+        except Exception as e:
+            app.logger.error(f"HR login error: {e}")
+            flash("Login error. Please try again.", "danger")
+
+    return render_template("hr_login.html", 
+                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")    
+
+
+@app.route("/hr/scheduling")
+def scheduling():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    return render_template("module_placeholder.html", 
+                         module_name="Scheduling",
+                         description="Create and manage work schedules and shifts")
+
+@app.route("/hr/leave-management")
+def leave_management():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    return render_template("module_placeholder.html", 
+                         module_name="Leave Management",
+                         description="Approve and track staff leave requests")
+
+@app.route("/hr/attendance-record")
+def attendance_record():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    return render_template("module_placeholder.html", 
+                         module_name="Attendance Record",
+                         description="Track staff attendance and punctuality")
+
+@app.route("/hr/departments")
+def departments():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get all departments with staff count
+        cur.execute("""
+            SELECT d.*, 
+                   COUNT(s.id) as staff_count
+            FROM departments d
+            LEFT JOIN staff s ON d.id = s.department_id AND s.status = 'Active'
+            GROUP BY d.id
+            ORDER BY d.name
+        """)
+        dept_list = cur.fetchall()
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching departments: {e}")
+        dept_list = []
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template("hr_departments.html", 
+                         module_name="Departments",
+                         description="Manage hospital departments and reporting structure",
+                         departments=dept_list)
+
+@app.route("/hr/reports")
+def hr_reports():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    return render_template("module_placeholder.html", 
+                         module_name="HR Reports",
+                         description="Generate HR analytics and reports")
+
+# # -------------------- QUICK ACTION PLACEHOLDERS --------------------
+# @app.route("/hr/add-staff")
+# def add_staff():
+#     if "hr_user_id" not in session:
+#         return redirect(url_for("hr_login"))
+#     flash("Feature coming soon: Add New Staff", "info")
+#     return redirect(url_for("hr_dashboard"))
+
+@app.route("/hr/approve-leave")
+def approve_leave():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    flash("Feature coming soon: Approve Leave Requests", "info")
+    return redirect(url_for("hr_dashboard"))
+
+@app.route("/hr/mark-attendance")
+def mark_attendance():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    flash("Feature coming soon: Mark Attendance", "info")
+    return redirect(url_for("hr_dashboard"))
+
+@app.route("/hr/generate-payroll")
+def generate_payroll():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    flash("Feature coming soon: Generate Payroll", "info")
+    return redirect(url_for("hr_dashboard"))
+
+@app.route("/hr/upload-documents")
+def upload_documents():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    flash("Feature coming soon: Upload Documents", "info")
+    return redirect(url_for("hr_dashboard"))
+
+@app.route("/hr/send-notifications")
+def send_notifications():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    flash("Feature coming soon: Send Notifications", "info")
+    return redirect(url_for("hr_dashboard"))
+
+@app.route("/hr/dashboard")
+def hr_dashboard():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    # Get HR statistics
+    conn = get_db_connection()
+    if not conn:
+        flash("Database connection error", "danger")
+        return redirect(url_for("hr_login"))
+    
+    cur = conn.cursor()
+    
+    try:
+        # Total staff
+        cur.execute("SELECT COUNT(*) FROM staff WHERE status = 'Active'")
+        total_staff = cur.fetchone()[0] or 0
+        
+        # Staff active today (attendance)
+        today = date.today()
+        cur.execute("""
+            SELECT COUNT(DISTINCT staff_id) 
+            FROM attendance 
+            WHERE date = %s AND status IN ('Present', 'Late')
+        """, (today,))
+        active_staff = cur.fetchone()[0] or 0
+        
+        # Staff on leave today
+        cur.execute("""
+            SELECT COUNT(*) 
+            FROM leaves 
+            WHERE %s BETWEEN start_date AND end_date 
+            AND status = 'Approved'
+        """, (today,))
+        on_leave = cur.fetchone()[0] or 0
+        
+        # Departments count
+        cur.execute("SELECT COUNT(*) FROM departments WHERE status = 'Active'")
+        departments_count = cur.fetchone()[0] or 0
+        
+        # Pending leave requests
+        cur.execute("SELECT COUNT(*) FROM leaves WHERE status = 'Pending'")
+        pending_leave = cur.fetchone()[0] or 0
+        
+        # Upcoming shifts (next 7 days)
+        next_week = today + timedelta(days=7)
+        cur.execute("""
+            SELECT COUNT(*) 
+            FROM schedules 
+            WHERE schedule_date BETWEEN %s AND %s
+        """, (today, next_week))
+        upcoming_shifts = cur.fetchone()[0] or 0
+        
+        # Pending updates (staff with missing info)
+        cur.execute("""
+            SELECT COUNT(*) 
+            FROM staff 
+            WHERE emergency_contact IS NULL OR address IS NULL
+        """)
+        pending_updates = cur.fetchone()[0] or 0
+        
+        # Late arrivals today
+        cur.execute("""
+            SELECT COUNT(*) 
+            FROM attendance 
+            WHERE date = %s AND status = 'Late'
+        """, (today,))
+        late_arrivals = cur.fetchone()[0] or 0
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching HR stats: {e}")
+        # Set default values on error
+        total_staff = active_staff = on_leave = departments_count = 0
+        pending_leave = upcoming_shifts = pending_updates = late_arrivals = 0
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template(
+        "hr_dashboard.html",
+        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        total_staff=total_staff,
+        active_staff=active_staff,
+        on_leave=on_leave,
+        departments_count=departments_count,
+        pending_leave=pending_leave,
+        upcoming_shifts=upcoming_shifts,
+        pending_updates=pending_updates,
+        late_arrivals=late_arrivals,
+        current_year=date.today().year
+    )
+    
+@app.route("/hr/logout")
+def hr_logout():
+    session.pop("hr_user_id", None)
+    session.pop("hr_username", None)
+    session.pop("hr_full_name", None)
+    session.pop("hr_role", None)
+    flash("Logged out successfully", "success")
+    return redirect(url_for("hr_login"))
+
+@app.route("/hr/staff-management")
+def staff_management():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    conn = get_db_connection()
+    if not conn:
+        flash("Database connection error", "danger")
+        return redirect(url_for("hr_login"))
+    
+    cur = conn.cursor()
+    
+    try:
+        # Get staff list with department names
+        cur.execute("""
+            SELECT s.id, s.staff_id, s.first_name, s.last_name, 
+                   s.position, s.employment_type, s.email, s.phone,
+                   s.hire_date, s.salary, s.status, s.emergency_contact,
+                   s.address, d.name as department_name
+            FROM staff s
+            LEFT JOIN departments d ON s.department_id = d.id
+            ORDER BY s.id DESC
+            LIMIT 100
+        """)
+        staff_list = cur.fetchall()
+        
+        # Get statistics
+        cur.execute("SELECT COUNT(*) FROM staff WHERE status = 'Active'")
+        total_staff = cur.fetchone()[0] or 0
+        
+        cur.execute("SELECT COUNT(*) FROM staff WHERE status = 'Active' AND employment_type = 'Full-Time'")
+        active_staff = cur.fetchone()[0] or 0
+        
+        cur.execute("SELECT COUNT(*) FROM staff WHERE employment_type = 'Contract'")
+        on_contract = cur.fetchone()[0] or 0
+        
+        cur.execute("SELECT COUNT(DISTINCT department_id) FROM staff")
+        departments_count = cur.fetchone()[0] or 0
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching staff data: {e}")
+        staff_list = []
+        total_staff = active_staff = on_contract = departments_count = 0
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template("staff_management.html", 
+                         module_name="Staff Management",
+                         description="Manage staff profiles, positions, and employment details",
+                         staff_list=staff_list,
+                         total_staff=total_staff,
+                         active_staff=active_staff,
+                         on_contract=on_contract,
+                         departments_count=departments_count,
+                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+                         current_year=date.today().year)    
+# View Staff Details
+@app.route("/hr/staff/<int:staff_id>")
+def view_staff(staff_id):
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get staff details with department
+        cur.execute("""
+            SELECT s.*, d.name as department_name, d.code as department_code
+            FROM staff s
+            LEFT JOIN departments d ON s.department_id = d.id
+            WHERE s.id = %s
+        """, (staff_id,))
+        
+        staff = cur.fetchone()
+        
+        if not staff:
+            flash("Staff member not found", "danger")
+            return redirect(url_for("staff_management"))
+        
+        # Convert to dictionary for easier template access
+        staff_dict = {
+            'id': staff[0],
+            'staff_id': staff[1],
+            'first_name': staff[2],
+            'last_name': staff[3],
+            'department_id': staff[4],
+            'position': staff[5],
+            'employment_type': staff[6],
+            'email': staff[7],
+            'phone': staff[8],
+            'hire_date': staff[9],
+            'salary': float(staff[10]) if staff[10] else 0,
+            'status': staff[11],
+            'emergency_contact': staff[12],
+            'address': staff[13],
+            'department_name': staff[14],
+            'department_code': staff[15]
+        }
+        
+        # Calculate employment duration
+        from datetime import date
+        today = date.today()
+        
+        # Ensure hire_date is a date object
+        hire_date = staff[9]
+        if isinstance(hire_date, str):
+            from datetime import datetime
+            hire_date = datetime.strptime(hire_date, '%Y-%m-%d').date()
+        
+        years = today.year - hire_date.year
+        months = today.month - hire_date.month
+        
+        if months < 0:
+            years -= 1
+            months += 12
+        
+        employment_duration = f"{years} year(s), {months} month(s)"
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching staff details: {e}")
+        flash("Error loading staff details", "danger")
+        return redirect(url_for("staff_management"))
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template("view_staff.html", 
+                         staff=staff_dict,
+                         today=today,
+                         employment_duration=employment_duration,
+                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+# Add New Staff
+@app.route("/hr/staff/add", methods=["GET", "POST"])
+def add_staff():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    if request.method == "POST":
+        # Get form data
+        staff_id = request.form.get('staff_id')
+        first_name = request.form.get('first_name')
+        last_name = request.form.get('last_name')
+        department_id = request.form.get('department_id')
+        position = request.form.get('position')
+        employment_type = request.form.get('employment_type')
+        email = request.form.get('email')
+        phone = request.form.get('phone')
+        hire_date = request.form.get('hire_date')
+        salary = request.form.get('salary')
+        emergency_contact = request.form.get('emergency_contact')
+        address = request.form.get('address')
+        
+        # Validate required fields
+        if not all([staff_id, first_name, last_name, department_id, position, hire_date]):
+            flash("Please fill in all required fields", "danger")
+            return redirect(url_for("add_staff"))
+        
+        conn = get_db_connection()
+        if not conn:
+            flash("Database connection error", "danger")
+            return redirect(url_for("add_staff"))
+        
+        cur = conn.cursor()
+        
+        try:
+            # Check if staff ID already exists
+            cur.execute("SELECT id FROM staff WHERE staff_id = %s", (staff_id,))
+            if cur.fetchone():
+                flash(f"Staff ID '{staff_id}' already exists. Please use a different ID.", "danger")
+                return redirect(url_for("add_staff"))
+            
+            # Convert salary to decimal or set to 0
+            try:
+                salary_decimal = float(salary) if salary else 0.00
+            except ValueError:
+                salary_decimal = 0.00
+            
+            # Insert new staff
+            cur.execute("""
+                INSERT INTO staff (
+                    staff_id, first_name, last_name, department_id, 
+                    position, employment_type, email, phone, 
+                    hire_date, salary, emergency_contact, address, status
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Active')
+            """, (
+                staff_id, first_name, last_name, department_id,
+                position, employment_type, email, phone,
+                hire_date, salary_decimal, emergency_contact, address
+            ))
+            
+            conn.commit()
+            flash(f"Staff member {first_name} {last_name} (ID: {staff_id}) added successfully!", "success")
+            
+            # Redirect to staff management or view the new staff
+            cur.execute("SELECT id FROM staff WHERE staff_id = %s", (staff_id,))
+            new_staff_id = cur.fetchone()[0]
+            return redirect(url_for("view_staff", staff_id=new_staff_id))
+            
+        except Exception as e:
+            conn.rollback()
+            app.logger.error(f"Error adding staff: {e}")
+            flash(f"Error adding staff: {str(e)}", "danger")
+            return redirect(url_for("add_staff"))
+            
+        finally:
+            cur.close()
+            conn.close()
+    
+    # GET request - show form
+    conn = get_db_connection()
+    if not conn:
+        flash("Database connection error", "danger")
+        return redirect(url_for("staff_management"))
+    
+    cur = conn.cursor()
+    
+    try:
+        # Get departments for dropdown
+        cur.execute("SELECT id, name, code FROM departments WHERE status = 'Active' ORDER BY name")
+        departments = cur.fetchall()
+        
+        # Get next staff ID suggestion
+        cur.execute("""
+            SELECT MAX(staff_id) FROM staff 
+            WHERE staff_id ~ '^EMP[0-9]+$'
+        """)
+        last_staff_id = cur.fetchone()[0]
+        
+        if last_staff_id:
+            # Extract number and increment
+            import re
+            match = re.search(r'EMP(\d+)', last_staff_id)
+            if match:
+                next_num = int(match.group(1)) + 1
+                suggested_id = f"EMP{next_num:03d}"
+            else:
+                suggested_id = "EMP001"
+        else:
+            suggested_id = "EMP001"
+            
+        # Get current date for hire date default
+        today = date.today().strftime("%Y-%m-%d")
+        
+    except Exception as e:
+        app.logger.error(f"Error loading form data: {e}")
+        departments = []
+        suggested_id = "EMP001"
+        today = date.today().strftime("%Y-%m-%d")
+        
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template("add_staff.html",
+                         departments=departments,
+                         suggested_id=suggested_id,
+                         today=today,
+                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+
+# Edit Staff
+@app.route("/hr/staff/edit/<int:staff_id>", methods=["GET", "POST"])
+def edit_staff(staff_id):
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    if request.method == "POST":
+        # Update staff
+        first_name = request.form.get('first_name')
+        last_name = request.form.get('last_name')
+        department_id = request.form.get('department_id')
+        position = request.form.get('position')
+        employment_type = request.form.get('employment_type')
+        email = request.form.get('email')
+        phone = request.form.get('phone')
+        salary = request.form.get('salary')
+        status = request.form.get('status')
+        emergency_contact = request.form.get('emergency_contact')
+        address = request.form.get('address')
+        
+        try:
+            cur.execute("""
+                UPDATE staff SET
+                    first_name = %s,
+                    last_name = %s,
+                    department_id = %s,
+                    position = %s,
+                    employment_type = %s,
+                    email = %s,
+                    phone = %s,
+                    salary = %s,
+                    status = %s,
+                    emergency_contact = %s,
+                    address = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (
+                first_name, last_name, department_id,
+                position, employment_type, email, phone,
+                salary, status, emergency_contact, address,
+                staff_id
+            ))
+            
+            conn.commit()
+            flash("Staff details updated successfully!", "success")
+            return redirect(url_for("view_staff", staff_id=staff_id))
+            
+        except Exception as e:
+            conn.rollback()
+            app.logger.error(f"Error updating staff: {e}")
+            flash("Error updating staff details", "danger")
+    
+    # GET request - load staff data
+    try:
+        cur.execute("SELECT * FROM staff WHERE id = %s", (staff_id,))
+        staff = cur.fetchone()
+        
+        if not staff:
+            flash("Staff member not found", "danger")
+            return redirect(url_for("staff_management"))
+        
+        # Get departments
+        cur.execute("SELECT id, name FROM departments WHERE status = 'Active' ORDER BY name")
+        departments = cur.fetchall()
+        
+    except Exception as e:
+        app.logger.error(f"Error loading staff for edit: {e}")
+        flash("Error loading staff details", "danger")
+        return redirect(url_for("staff_management"))
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template("edit_staff.html",
+                         staff=staff,
+                         departments=departments,
+                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+
 # -------------------- RUN APP --------------------
 if __name__ == "__main__":
-    create_tables()
-    create_default_users()
+    create_tables()  # Your existing tables
+    create_default_users()  # Your existing default users
+    create_hr_tables()  # Add this line for HR tables
     app.run(debug=True)

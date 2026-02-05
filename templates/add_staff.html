@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New Staff | HR Dashboard</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3b5bdb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --dark: #1e293b;
+            --gray: #64748b;
+            --light: #f8fafc;
+        }
+        
+        body {
+            background: #f8fafc;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            color: var(--dark);
+        }
+        
+        /* Top Bar */
+        .topbar {
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .user-info h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0;
+            color: var(--primary);
+        }
+        
+        /* Page Header */
+        .page-header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border-radius: 0 0 15px 15px;
+        }
+        
+        /* Form Container */
+        .form-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+        
+        .form-card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            margin-bottom: 2rem;
+        }
+        
+        .form-section {
+            margin-bottom: 2rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .form-section:last-child {
+            border-bottom: none;
+        }
+        
+        .section-title {
+            color: var(--primary);
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .required::after {
+            content: " *";
+            color: var(--danger);
+        }
+        
+        .form-label {
+            font-weight: 500;
+            color: var(--dark);
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-control, .form-select {
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 0.75rem;
+            font-size: 0.95rem;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+        }
+        
+        .form-text {
+            font-size: 0.85rem;
+            color: var(--gray);
+        }
+        
+        /* Form Actions */
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        /* Alert Styling */
+        .alert {
+            border-radius: 8px;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ================= TOP BAR ================= -->
+    <header class="topbar">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="user-info">
+                <h2>Human Resources</h2>
+                <p class="mb-0">Add New Staff | {{ hospital_name }}</p>
+            </div>
+            <div>
+                <a href="{{ url_for('staff_management') }}" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Staff
+                </a>
+                <a href="{{ url_for('hr_logout') }}" class="btn btn-outline-danger">
+                    <i class="fas fa-sign-out-alt me-1"></i> Logout
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- ================= PAGE HEADER ================= -->
+    <div class="page-header">
+        <div class="container">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fas fa-user-plus fa-2x"></i>
+                <div>
+                    <h1 class="mb-1">Add New Staff Member</h1>
+                    <p class="mb-0 opacity-75">Register new employee with complete details</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= FORM ================= -->
+    <div class="form-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="form-card">
+            <form method="POST" action="{{ url_for('add_staff') }}" id="addStaffForm">
+                
+                <!-- Personal Information -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-user-circle"></i> Personal Information
+                    </h3>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="staff_id" class="form-label required">Staff ID</label>
+                            <input type="text" class="form-control" id="staff_id" name="staff_id" 
+                                   value="{{ suggested_id }}" required>
+                            <div class="form-text">Unique identifier for the staff member</div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="hire_date" class="form-label required">Hire Date</label>
+                            <input type="date" class="form-control" id="hire_date" name="hire_date" 
+                                   value="{{ today }}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="first_name" class="form-label required">First Name</label>
+                            <input type="text" class="form-control" id="first_name" name="first_name" required>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="last_name" class="form-label required">Last Name</label>
+                            <input type="text" class="form-control" id="last_name" name="last_name" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Employment Details -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-briefcase"></i> Employment Details
+                    </h3>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="department_id" class="form-label required">Department</label>
+                            <select class="form-select" id="department_id" name="department_id" required>
+                                <option value="">Select Department</option>
+                                {% for dept in departments %}
+                                    <option value="{{ dept[0] }}">{{ dept[1] }} ({{ dept[2] }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="position" class="form-label required">Position/Title</label>
+                            <input type="text" class="form-control" id="position" name="position" 
+                                   placeholder="e.g., Senior Doctor, Head Nurse" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="employment_type" class="form-label">Employment Type</label>
+                            <select class="form-select" id="employment_type" name="employment_type">
+                                <option value="Full-Time">Full-Time</option>
+                                <option value="Part-Time">Part-Time</option>
+                                <option value="Contract">Contract</option>
+                                <option value="Temporary">Temporary</option>
+                                <option value="Intern">Intern</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="salary" class="form-label">Monthly Salary (₦)</label>
+                            <input type="number" class="form-control" id="salary" name="salary" 
+                                   placeholder="0.00" step="0.01" min="0">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Contact Information -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-address-book"></i> Contact Information
+                    </h3>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label">Email Address</label>
+                            <input type="email" class="form-control" id="email" name="email" 
+                                   placeholder="staff@hospital.com">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="phone" class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" 
+                                   placeholder="08012345678">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="address" class="form-label">Residential Address</label>
+                        <textarea class="form-control" id="address" name="address" 
+                                  rows="3" placeholder="Full residential address"></textarea>
+                    </div>
+                </div>
+                
+                <!-- Emergency Contact -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-phone-alt"></i> Emergency Contact
+                    </h3>
+                    
+                    <div class="mb-3">
+                        <label for="emergency_contact" class="form-label">Emergency Contact Details</label>
+                        <input type="text" class="form-control" id="emergency_contact" name="emergency_contact" 
+                               placeholder="Name & Phone (e.g., John Doe - 08012345678)">
+                        <div class="form-text">Name and phone number of emergency contact person</div>
+                    </div>
+                </div>
+                
+                <!-- Form Actions -->
+                <div class="form-actions">
+                    <a href="{{ url_for('staff_management') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Save Staff Member
+                    </button>
+                </div>
+                
+            </form>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Form validation
+        document.getElementById('addStaffForm').addEventListener('submit', function(e) {
+            const staffId = document.getElementById('staff_id').value;
+            const firstName = document.getElementById('first_name').value;
+            const lastName = document.getElementById('last_name').value;
+            const department = document.getElementById('department_id').value;
+            const position = document.getElementById('position').value;
+            const hireDate = document.getElementById('hire_date').value;
+            
+            if (!staffId || !firstName || !lastName || !department || !position || !hireDate) {
+                e.preventDefault();
+                alert('Please fill in all required fields marked with *');
+                return false;
+            }
+            
+            // Validate date format
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+            if (hireDate && !dateRegex.test(hireDate)) {
+                e.preventDefault();
+                alert('Please enter a valid date in YYYY-MM-DD format');
+                return false;
+            }
+            
+            return true;
+        });
+        
+        // Auto-format phone number
+        document.getElementById('phone').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 11) value = value.substring(0, 11);
+            
+            if (value.length >= 3) {
+                value = value.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+            } else if (value.length >= 7) {
+                value = value.replace(/(\d{3})(\d{3})/, '$1-$2');
+            }
+            
+            e.target.value = value;
+        });
+        
+        // Today's date for hire date
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!document.getElementById('hire_date').value) {
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('hire_date').value = today;
+            }
+        });
+    </script>
+
+</body>
+</html>
