@@ -45,23 +45,23 @@
             </div>
         </a>
 
-        <a href="#" class="card-link">
+        <a href="{{ url_for('todays_collection') }}" class="card-link">
             <div class="card">
                 <i class="fa-solid fa-money-bill-trend-up"></i>
-                <h3>Today’s Collection</h3>
+                <h3>Today's Collection</h3>
                 <p>Total amount collected today</p>
             </div>
         </a>
 
-        <a href="#" class="card-link">
+        <!-- <a href="#" class="card-link">
             <div class="card">
                 <i class="fa-solid fa-chart-line"></i>
                 <h3>Revenue Report</h3>
                 <p>Daily, weekly & monthly reports</p>
             </div>
-        </a>
+        </a> -->
 
-        <a href="#" class="card-link">
+        <a href="{{ url_for('payment_history') }}" class="card-link">
             <div class="card">
                 <i class="fa-solid fa-receipt"></i>
                 <h3>Payment History</h3>
@@ -69,13 +69,13 @@
             </div>
         </a>
 
-        <a href="#" class="card-link">
+        <!-- <a href="#" class="card-link">
             <div class="card">
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <h3>Search Receipt</h3>
                 <p>Find receipt by number or patient</p>
             </div>
-        </a>
+        </a> -->
     </section>
 
 </body>

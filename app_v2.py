@@ -201,6 +201,11 @@ def create_default_users():
     conn.close()
 
 # -------------------- HELPER FUNCTIONS --------------------
+def format_currency(amount):
+    """Format amount as Nigerian Naira currency."""
+    return f"₦{amount:,.2f}"
+
+
 def build_stock_snapshot(rows, today):
     stock = []
     for r in rows:
@@ -1032,6 +1037,567 @@ def view_payment_receipt(payment_id):
     return render_template("payment_receipt.html", payment=payment)
 
 
+# -------------------- ROUTES: BILLING MODULE - PAYMENT HISTORY --------------------
+
+@app.route("/billing/payment-history")
+def payment_history():
+    if "billing_user_id" not in session:
+        return redirect(url_for("billing_login"))
+
+    # Get filter parameters
+    patient_name = request.args.get("patient_name", "").strip()
+    service_type = request.args.get("service_type", "")
+    payment_method = request.args.get("payment_method", "")
+    status = request.args.get("status", "")
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    
+    # Pagination
+    page = request.args.get("page", 1, type=int)
+    per_page = 20
+    
+    # Build query
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Base query
+    query = "SELECT * FROM payments WHERE 1=1"
+    count_query = "SELECT COUNT(*) FROM payments WHERE 1=1"
+    params = []
+    
+    # Apply filters
+    if patient_name:
+        query += " AND LOWER(patient_name) LIKE LOWER(%s)"
+        count_query += " AND LOWER(patient_name) LIKE LOWER(%s)"
+        params.append(f"%{patient_name}%")
+    
+    if service_type:
+        query += " AND service_type = %s"
+        count_query += " AND service_type = %s"
+        params.append(service_type)
+    
+    if payment_method:
+        query += " AND payment_method = %s"
+        count_query += " AND payment_method = %s"
+        params.append(payment_method)
+    
+    if status:
+        query += " AND status = %s"
+        count_query += " AND status = %s"
+        params.append(status)
+    
+    if start_date:
+        query += " AND payment_date >= %s"
+        count_query += " AND payment_date >= %s"
+        params.append(start_date)
+    
+    if end_date:
+        query += " AND payment_date <= %s"
+        count_query += " AND payment_date <= %s"
+        params.append(end_date)
+    
+    # Get total count
+    cur.execute(count_query, params)
+    total_items = cur.fetchone()[0]
+    
+    # Apply ordering and pagination
+    query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
+    offset = (page - 1) * per_page
+    params.extend([per_page, offset])
+    
+    # Execute main query
+    cur.execute(query, params)
+    payments = cur.fetchall()
+    
+    # Get unique service types for dropdown
+    cur.execute("SELECT DISTINCT service_type FROM payments WHERE service_type IS NOT NULL ORDER BY service_type")
+    service_types = [row[0] for row in cur.fetchall()]
+    
+    # Calculate total amount
+    total_amount = 0
+    formatted_payments = []
+    for payment in payments:
+        payment_dict = {
+            "id": payment[0],
+            "patient_name": payment[1],
+            "service_type": payment[2],
+            "subtotal": float(payment[3]),
+            "discount": float(payment[4]),
+            "tax": float(payment[5]),
+            "grand_total": float(payment[6]),
+            "amount_paid": float(payment[7]),
+            "balance": float(payment[8]),
+            "payment_method": payment[9],
+            "status": payment[10],
+            "payment_date": payment[11],
+            "created_at": payment[13]
+        }
+        formatted_payments.append(payment_dict)
+        total_amount += payment_dict["amount_paid"]
+    
+    cur.close()
+    conn.close()
+    
+    # Calculate pagination
+    total_pages = (total_items + per_page - 1) // per_page
+    
+    return render_template(
+        "billing_payment_history.html",
+        payments=formatted_payments,
+        service_types=service_types,
+        total_items=total_items,
+        total_amount=total_amount,
+        page=page,
+        total_pages=total_pages,
+        current_filters=request.args
+    )
+
+
+@app.route("/billing/payment-history/export")
+def export_payment_history():
+    if "billing_user_id" not in session:
+        return redirect(url_for("billing_login"))
+    
+    # Get filter parameters (same as payment_history)
+    patient_name = request.args.get("patient_name", "").strip()
+    service_type = request.args.get("service_type", "")
+    payment_method = request.args.get("payment_method", "")
+    status = request.args.get("status", "")
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Build query without pagination
+    query = "SELECT * FROM payments WHERE 1=1"
+    params = []
+    
+    if patient_name:
+        query += " AND LOWER(patient_name) LIKE LOWER(%s)"
+        params.append(f"%{patient_name}%")
+    
+    if service_type:
+        query += " AND service_type = %s"
+        params.append(service_type)
+    
+    if payment_method:
+        query += " AND payment_method = %s"
+        params.append(payment_method)
+    
+    if status:
+        query += " AND status = %s"
+        params.append(status)
+    
+    if start_date:
+        query += " AND payment_date >= %s"
+        params.append(start_date)
+    
+    if end_date:
+        query += " AND payment_date <= %s"
+        params.append(end_date)
+    
+    query += " ORDER BY created_at DESC"
+    cur.execute(query, params)
+    payments = cur.fetchall()
+    
+    # Create Excel workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Payment History"
+    
+    # Add headers
+    headers = [
+        "Receipt No", "Patient Name", "Service Type", 
+        "Subtotal (₦)", "Discount (₦)", "Tax (₦)", "Grand Total (₦)",
+        "Amount Paid (₦)", "Balance (₦)", "Payment Method",
+        "Status", "Payment Date", "Created At", "Recorded By"
+    ]
+    ws.append(headers)
+    
+    # Style headers
+    from openpyxl.styles import Font, PatternFill, Alignment
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
+    
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+    
+    # Add data rows
+    for payment in payments:
+        ws.append([
+            payment[0],  # id
+            payment[1],  # patient_name
+            payment[2],  # service_type
+            float(payment[3]),  # subtotal
+            float(payment[4]),  # discount
+            float(payment[5]),  # tax
+            float(payment[6]),  # grand_total
+            float(payment[7]),  # amount_paid
+            float(payment[8]),  # balance
+            payment[9],  # payment_method
+            payment[10],  # status
+            payment[11],  # payment_date
+            payment[13],  # created_at
+            payment[12]   # recorded_by
+        ])
+    
+    # Auto-adjust column widths
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 30)
+        ws.column_dimensions[column_letter].width = adjusted_width
+    
+    # Add summary row
+    ws.append([])
+    ws.append(["SUMMARY", "", "", "", "", "", "", "", "", "", "", "", "", ""])
+    
+    if payments:
+        total_amount = sum(float(p[7]) for p in payments)
+        total_balance = sum(float(p[8]) for p in payments)
+        
+        summary_headers = ["Total Payments", "Total Amount", "Total Balance"]
+        summary_values = [len(payments), total_amount, total_balance]
+        
+        for i, (header, value) in enumerate(zip(summary_headers, summary_values)):
+            ws.append([header, value])
+        
+        # Style summary
+        summary_row = ws.max_row - len(summary_headers) + 1
+        for i in range(len(summary_headers)):
+            ws.cell(row=summary_row + i, column=1).font = Font(bold=True)
+    
+    # Save to BytesIO
+    from io import BytesIO
+    stream = BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    
+    cur.close()
+    conn.close()
+    
+    # Generate filename
+    filename = f"payment_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return send_file(
+        stream,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+# -------------------- ROUTES: TODAY'S COLLECTION --------------------
+
+@app.route("/billing/todays-collection")
+def todays_collection():
+    if "billing_user_id" not in session:
+        return redirect(url_for("billing_login"))
+    
+    today = date.today()
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Get today's payments
+    cur.execute("""
+        SELECT id, patient_name, service_type, amount_paid, 
+               payment_method, status, created_at
+        FROM payments 
+        WHERE DATE(payment_date) = %s
+        ORDER BY created_at DESC
+    """, (today,))
+    
+    today_payments = cur.fetchall()
+    
+    # Calculate totals by payment method
+    payment_methods_data = {
+        'Cash': {'amount': 0, 'count': 0},
+        'Card': {'amount': 0, 'count': 0},
+        'Transfer': {'amount': 0, 'count': 0},
+        'POS': {'amount': 0, 'count': 0},
+        'Insurance': {'amount': 0, 'count': 0},
+        'Other': {'amount': 0, 'count': 0}
+    }
+    
+    # Process payments
+    total_transactions = len(today_payments)
+    grand_total = 0
+    amounts = []
+    
+    recent_transactions = []
+    for payment in today_payments:
+        amount_paid = float(payment[3])
+        payment_method = payment[4]
+        
+        # Add to grand total
+        grand_total += amount_paid
+        amounts.append(amount_paid)
+        
+        # Add to payment method totals
+        if payment_method in payment_methods_data:
+            payment_methods_data[payment_method]['amount'] += amount_paid
+            payment_methods_data[payment_method]['count'] += 1
+        else:
+            payment_methods_data['Other']['amount'] += amount_paid
+            payment_methods_data['Other']['count'] += 1
+        
+        # Prepare recent transactions data
+        recent_transactions.append({
+            'id': payment[0],
+            'patient_name': payment[1],
+            'service_type': payment[2],
+            'amount_paid': amount_paid,
+            'payment_method': payment_method,
+            'status': payment[5],
+            'created_at': payment[6]
+        })
+    
+    # Calculate additional statistics
+    average_transaction = grand_total / total_transactions if total_transactions > 0 else 0
+    highest_transaction = max(amounts) if amounts else 0
+    lowest_transaction = min(amounts) if amounts else 0
+    
+    # Calculate totals for time periods
+    morning_total = 0  # 6AM - 12PM
+    afternoon_total = 0  # 12PM - 4PM
+    evening_total = 0  # 4PM - 10PM
+    
+    for payment in today_payments:
+        created_at = payment[6]
+        if created_at:
+            hour = created_at.hour
+            amount = float(payment[3])
+            
+            if 6 <= hour < 12:
+                morning_total += amount
+            elif 12 <= hour < 16:
+                afternoon_total += amount
+            elif 16 <= hour < 22:
+                evening_total += amount
+    
+    # Prepare payment methods for template
+    payment_methods = []
+    for method_name, data in payment_methods_data.items():
+        if data['count'] > 0:  # Only include methods with transactions
+            percentage = (data['amount'] / grand_total * 100) if grand_total > 0 else 0
+            payment_methods.append({
+                'name': method_name,
+                'amount': data['amount'],
+                'count': data['count'],
+                'percentage': round(percentage, 1)
+            })
+    
+    # Set daily target (you can make this configurable)
+    daily_target = 500000.00  # ₦500,000 daily target
+    
+    cur.close()
+    conn.close()
+    
+    # Format date for display
+    today_date = today.strftime("%A, %B %d, %Y")
+    
+    return render_template(
+        "todays_collection.html",
+        today_date=today_date,
+        grand_total=grand_total,
+        cash_total=payment_methods_data['Cash']['amount'],
+        card_total=payment_methods_data['Card']['amount'],
+        transfer_total=payment_methods_data['Transfer']['amount'],
+        pos_total=payment_methods_data['POS']['amount'],
+        insurance_total=payment_methods_data['Insurance']['amount'],
+        other_total=payment_methods_data['Other']['amount'],
+        payment_methods=payment_methods,
+        recent_transactions=recent_transactions,
+        total_transactions=total_transactions,
+        average_transaction=average_transaction,
+        highest_transaction=highest_transaction,
+        lowest_transaction=lowest_transaction,
+        morning_total=morning_total,
+        afternoon_total=afternoon_total,
+        evening_total=evening_total,
+        daily_target=daily_target
+    )
+
+
+@app.route("/billing/todays-collection/export")
+def export_todays_collection():
+    if "billing_user_id" not in session:
+        return redirect(url_for("billing_login"))
+    
+    today = date.today()
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Get today's payments
+    cur.execute("""
+        SELECT id, patient_name, service_type, subtotal, discount, tax,
+               grand_total, amount_paid, balance, payment_method, 
+               status, payment_date, created_at
+        FROM payments 
+        WHERE DATE(payment_date) = %s
+        ORDER BY created_at DESC
+    """, (today,))
+    
+    today_payments = cur.fetchall()
+    
+    # Create Excel workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Today's Collection - {today}"
+    
+    # Add title
+    ws.append([f"Today's Collection Report - {today.strftime('%B %d, %Y')}"])
+    ws.append([])
+    
+    # Add summary section
+    ws.append(["SUMMARY"])
+    ws.append([])
+    
+    # Calculate totals by payment method
+    payment_methods_data = {
+        'Cash': {'amount': 0, 'count': 0},
+        'Card': {'amount': 0, 'count': 0},
+        'Transfer': {'amount': 0, 'count': 0},
+        'POS': {'amount': 0, 'count': 0},
+        'Insurance': {'amount': 0, 'count': 0},
+        'Other': {'amount': 0, 'count': 0}
+    }
+    
+    grand_total = 0
+    total_transactions = len(today_payments)
+    
+    for payment in today_payments:
+        amount_paid = float(payment[7])
+        payment_method = payment[9]
+        grand_total += amount_paid
+        
+        if payment_method in payment_methods_data:
+            payment_methods_data[payment_method]['amount'] += amount_paid
+            payment_methods_data[payment_method]['count'] += 1
+        else:
+            payment_methods_data['Other']['amount'] += amount_paid
+            payment_methods_data['Other']['count'] += 1
+    
+    # Write summary
+    ws.append(["Total Transactions:", total_transactions])
+    ws.append(["Grand Total:", grand_total])
+    ws.append([])
+    ws.append(["Payment Method Breakdown"])
+    ws.append(["Method", "Count", "Amount", "Percentage"])
+    
+    for method_name, data in payment_methods_data.items():
+        if data['count'] > 0:
+            percentage = (data['amount'] / grand_total * 100) if grand_total > 0 else 0
+            ws.append([
+                method_name,
+                data['count'],
+                data['amount'],
+                f"{percentage:.1f}%"
+            ])
+    
+    ws.append([])
+    ws.append([])
+    
+    # Add detailed transactions
+    ws.append(["DETAILED TRANSACTIONS"])
+    ws.append([])
+    
+    headers = [
+        "Receipt No", "Patient Name", "Service Type", 
+        "Subtotal", "Discount", "Tax", "Grand Total",
+        "Amount Paid", "Balance", "Payment Method",
+        "Status", "Payment Date", "Time"
+    ]
+    ws.append(headers)
+    
+    # Style headers
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
+    border = Border(left=Side(style='thin'), 
+                   right=Side(style='thin'), 
+                   top=Side(style='thin'), 
+                   bottom=Side(style='thin'))
+    
+    for cell in ws[ws.max_row]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+        cell.border = border
+    
+    # Add data rows
+    for payment in today_payments:
+        ws.append([
+            payment[0],  # id
+            payment[1],  # patient_name
+            payment[2],  # service_type
+            float(payment[3]),  # subtotal
+            float(payment[4]),  # discount
+            float(payment[5]),  # tax
+            float(payment[6]),  # grand_total
+            float(payment[7]),  # amount_paid
+            float(payment[8]),  # balance
+            payment[9],  # payment_method
+            payment[10],  # status
+            payment[11].strftime('%Y-%m-%d'),  # payment_date
+            payment[12].strftime('%H:%M:%S') if payment[12] else ''  # created_at time
+        ])
+    
+    # Apply borders to data rows
+    for row in ws.iter_rows(min_row=ws.max_row - len(today_payments) + 1, max_row=ws.max_row):
+        for cell in row:
+            cell.border = border
+    
+    # Auto-adjust column widths
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 30)
+        ws.column_dimensions[column_letter].width = adjusted_width
+    
+    cur.close()
+    conn.close()
+    
+    # Save to BytesIO
+    from io import BytesIO
+    stream = BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    
+    # Generate filename
+    filename = f"todays_collection_{today.strftime('%Y%m%d')}.xlsx"
+    
+    return send_file(
+        stream,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+# Custom filter for currency formatting
+@app.template_filter('currency')
+def currency_filter(amount):
+    """Format amount as Nigerian Naira currency."""
+    if amount is None:
+        return "₦0.00"
+    return f"₦{float(amount):,.2f}"
 # -------------------- RUN APP --------------------
 if __name__ == "__main__":
     create_tables()

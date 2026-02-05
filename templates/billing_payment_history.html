@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment History | Billing Dashboard</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/billing_dashboard.css') }}">
+    
+    <style>
+        /* Payment History Specific Styles */
+        .payment-history-container {
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #2c3e50;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            margin-bottom: 20px;
+            transition: background 0.3s;
+        }
+        
+        .back-btn:hover {
+            background: #34495e;
+        }
+        
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .history-header h1 {
+            color: #2c3e50;
+            margin: 0;
+        }
+        
+        .filters-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .filter-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group label {
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+        
+        .form-group input,
+        .form-group select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .filter-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .filter-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .filter-btn:hover {
+            background: #2980b9;
+        }
+        
+        .reset-btn {
+            background: #95a5a6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .reset-btn:hover {
+            background: #7f8c8d;
+        }
+        
+        /* Payments Table */
+        .payments-table-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .payments-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .payments-table thead {
+            background: #2c3e50;
+            color: white;
+        }
+        
+        .payments-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        .payments-table tbody tr {
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+        
+        .payments-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .payments-table td {
+            padding: 15px;
+            color: #333;
+        }
+        
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-paid {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-partial {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-unpaid {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .action-btn {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: opacity 0.3s;
+        }
+        
+        .action-btn:hover {
+            opacity: 0.8;
+        }
+        
+        .view-btn {
+            background: #3498db;
+            color: white;
+        }
+        
+        .print-btn {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .payment-method {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 50px;
+            color: #7f8c8d;
+        }
+        
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #bdc3c7;
+        }
+        
+        .export-btn {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        
+        .export-btn:hover {
+            background: #219955;
+        }
+        
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #eee;
+        }
+        
+        .page-link {
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            color: #3498db;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        
+        .page-link:hover {
+            background: #e9ecef;
+        }
+        
+        .page-link.active {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+        
+        .page-info {
+            color: #6c757d;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .payments-table {
+                display: block;
+                overflow-x: auto;
+            }
+            
+            .history-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .filter-form {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ================= TOP BAR ================= -->
+    <header class="topbar">
+        <div class="user-info">
+            <h2>Billing & Revenue</h2>
+            <p>Welcome, {{ session.get('billing_username', 'User') }}</p>
+        </div>
+
+        <a href="{{ url_for('billing_logout') }}" class="logout-btn">
+            <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </a>
+    </header>
+
+    <div class="payment-history-container">
+        
+        <!-- Back Button -->
+        <a href="{{ url_for('billing_dashboard') }}" class="back-btn">
+            <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+        </a>
+        
+        <!-- Header -->
+        <div class="history-header">
+            <h1><i class="fa-solid fa-receipt"></i> Payment History</h1>
+            <a href="{{ url_for('export_payment_history', **request.args) }}" class="export-btn">
+                <i class="fa-solid fa-file-excel"></i> Export to Excel
+            </a>
+        </div>
+        
+        <!-- Filters Section -->
+        <div class="filters-section">
+            <form method="GET" action="{{ url_for('payment_history') }}" class="filter-form">
+                <div class="form-group">
+                    <label for="patient_name">Patient Name</label>
+                    <input type="text" id="patient_name" name="patient_name" 
+                           value="{{ request.args.get('patient_name', '') }}"
+                           placeholder="Search patient...">
+                </div>
+                
+                <div class="form-group">
+                    <label for="service_type">Service Type</label>
+                    <select id="service_type" name="service_type">
+                        <option value="">All Services</option>
+                        {% for service in service_types %}
+                            <option value="{{ service }}" {% if request.args.get('service_type') == service %}selected{% endif %}>
+                                {{ service }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="payment_method">Payment Method</label>
+                    <select id="payment_method" name="payment_method">
+                        <option value="">All Methods</option>
+                        <option value="Cash" {% if request.args.get('payment_method') == 'Cash' %}selected{% endif %}>Cash</option>
+                        <option value="Card" {% if request.args.get('payment_method') == 'Card' %}selected{% endif %}>Card</option>
+                        <option value="Transfer" {% if request.args.get('payment_method') == 'Transfer' %}selected{% endif %}>Transfer</option>
+                        <option value="POS" {% if request.args.get('payment_method') == 'POS' %}selected{% endif %}>POS</option>
+                        <option value="Insurance" {% if request.args.get('payment_method') == 'Insurance' %}selected{% endif %}>Insurance</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select id="status" name="status">
+                        <option value="">All Status</option>
+                        <option value="Paid" {% if request.args.get('status') == 'Paid' %}selected{% endif %}>Paid</option>
+                        <option value="Partial" {% if request.args.get('status') == 'Partial' %}selected{% endif %}>Partial</option>
+                        <option value="Unpaid" {% if request.args.get('status') == 'Unpaid' %}selected{% endif %}>Unpaid</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="start_date">From Date</label>
+                    <input type="date" id="start_date" name="start_date" 
+                           value="{{ request.args.get('start_date', '') }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="end_date">To Date</label>
+                    <input type="date" id="end_date" name="end_date" 
+                           value="{{ request.args.get('end_date', '') }}">
+                </div>
+                
+                <div class="filter-actions">
+                    <button type="submit" class="filter-btn">
+                        <i class="fa-solid fa-filter"></i> Filter
+                    </button>
+                    <a href="{{ url_for('payment_history') }}" class="reset-btn">
+                        <i class="fa-solid fa-rotate-left"></i> Reset
+                    </a>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Payments Table -->
+        <div class="payments-table-container">
+            {% if payments %}
+                <table class="payments-table">
+                    <thead>
+                        <tr>
+                            <th>Receipt No</th>
+                            <th>Patient Name</th>
+                            <th>Service Type</th>
+                            <th>Amount (₦)</th>
+                            <th>Date</th>
+                            <th>Payment Method</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in payments %}
+                            <tr>
+                                <td>#{{ payment.id }}</td>
+                                <td>{{ payment.patient_name }}</td>
+                                <td>{{ payment.service_type }}</td>
+                                <td style="font-weight: bold;">{{ "₦{:,.2f}".format(payment.amount_paid) }}</td>
+                                <td>{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <span class="payment-method">
+                                        {% if payment.payment_method == 'Cash' %}
+                                            <i class="fa-solid fa-money-bill"></i>
+                                        {% elif payment.payment_method == 'Card' %}
+                                            <i class="fa-solid fa-credit-card"></i>
+                                        {% elif payment.payment_method == 'Transfer' %}
+                                            <i class="fa-solid fa-building-columns"></i>
+                                        {% elif payment.payment_method == 'POS' %}
+                                            <i class="fa-solid fa-receipt"></i>
+                                        {% else %}
+                                            <i class="fa-solid fa-file-invoice"></i>
+                                        {% endif %}
+                                        {{ payment.payment_method }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if payment.status == 'Paid' %}
+                                        <span class="status-badge status-paid">
+                                            <i class="fa-solid fa-check-circle"></i> Paid
+                                        </span>
+                                    {% elif payment.status == 'Partial' %}
+                                        <span class="status-badge status-partial">
+                                            <i class="fa-solid fa-clock"></i> Partial
+                                        </span>
+                                    {% else %}
+                                        <span class="status-badge status-unpaid">
+                                            <i class="fa-solid fa-times-circle"></i> Unpaid
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div style="display: flex; gap: 5px;">
+                                        <a href="{{ url_for('billing_receipt', payment_id=payment.id) }}" 
+                                           class="action-btn view-btn" title="View Receipt">
+                                            <i class="fa-solid fa-eye"></i> View
+                                        </a>
+                                        <a href="{{ url_for('billing_receipt', payment_id=payment.id) }}" 
+                                           target="_blank" class="action-btn print-btn" title="Print Receipt">
+                                            <i class="fa-solid fa-print"></i> Print
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                
+                <!-- Pagination -->
+                {% if total_pages > 1 %}
+                    <div class="pagination">
+                        {% if page > 1 %}
+                            <a href="{{ url_for('payment_history', page=page-1, **request.args) }}" 
+                               class="page-link">
+                                <i class="fa-solid fa-chevron-left"></i> Previous
+                            </a>
+                        {% endif %}
+                        
+                        <span class="page-info">
+                            Page {{ page }} of {{ total_pages }}
+                        </span>
+                        
+                        {% if page < total_pages %}
+                            <a href="{{ url_for('payment_history', page=page+1, **request.args) }}" 
+                               class="page-link">
+                                Next <i class="fa-solid fa-chevron-right"></i>
+                            </a>
+                        {% endif %}
+                    </div>
+                {% endif %}
+                
+                <!-- Summary -->
+                <div style="padding: 15px; background: #f8f9fa; border-top: 1px solid #eee;">
+                    <strong>Summary:</strong> 
+                    {{ total_items }} payment(s) found. 
+                    Total Amount: <strong>₦{{ "₦{:,.2f}".format(total_amount) }}</strong>
+                </div>
+                
+            {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-receipt"></i>
+                    <h3>No Payment Records Found</h3>
+                    <p>No payments match your search criteria.</p>
+                    <a href="{{ url_for('payment_history') }}" class="reset-btn" style="margin-top: 15px;">
+                        <i class="fa-solid fa-rotate-left"></i> Clear Filters
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        // Set default date range to last 30 days if not specified
+        document.addEventListener('DOMContentLoaded', function() {
+            const startDateInput = document.getElementById('start_date');
+            const endDateInput = document.getElementById('end_date');
+            
+            if (!startDateInput.value && !endDateInput.value) {
+                const today = new Date();
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(today.getDate() - 30);
+                
+                endDateInput.value = today.toISOString().split('T')[0];
+                startDateInput.value = thirtyDaysAgo.toISOString().split('T')[0];
+            }
+        });
+    </script>
+
+</body>
+</html>
