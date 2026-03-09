@@ -71,6 +71,11 @@
             gap: 0.4rem;
         }
         
+        .logout-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(239, 68, 68, 0.3);
+        }
+        
         .page-title {
             text-align: center;
             margin: 2rem 0 3rem;
@@ -108,11 +113,28 @@
             transition: all 0.4s;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
         }
         
         .card-link:hover .card {
             transform: translateY(-12px) scale(1.03);
             box-shadow: 0 20px 40px rgba(67, 97, 238, 0.25);
+        }
+        
+        .card-link:hover .card::before {
+            left: 100%;
         }
         
         .card i {
@@ -134,6 +156,18 @@
             margin: 0;
         }
         
+        .badge-card {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--warning);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -152,6 +186,11 @@
             align-items: center;
             gap: 1rem;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
         }
         
         .stat-icon {
@@ -176,6 +215,56 @@
             margin: 0;
             font-size: 0.9rem;
             color: var(--gray);
+        }
+
+        .quick-actions {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .quick-actions h3 {
+            color: var(--dark);
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            background: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            text-decoration: none;
+            color: var(--dark);
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+        }
+
+        .action-btn:hover {
+            background: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .action-btn i {
+            font-size: 1rem;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--gray);
+            font-size: 0.9rem;
+            margin-top: 3rem;
         }
     </style>
 </head>
@@ -246,6 +335,31 @@
         </div>
     </section>
 
+    <!-- ================= QUICK ACTIONS ================= -->
+    <section class="quick-actions">
+        <h3><i class="fa-solid fa-bolt me-2" style="color: var(--warning);"></i>Quick Actions</h3>
+        <div class="action-buttons">
+            <a href="{{ url_for('request_leave') }}" class="action-btn">
+                <i class="fa-solid fa-plus"></i> New Leave Request
+            </a>
+            <a href="{{ url_for('leave_calendar') }}" class="action-btn">
+                <i class="fa-solid fa-calendar"></i> Leave Calendar
+            </a>
+            <a href="{{ url_for('staff_management') }}?action=add" class="action-btn">
+                <i class="fa-solid fa-user-plus"></i> Add Staff
+            </a>
+            <a href="{{ url_for('create_schedule') }}" class="action-btn">
+                <i class="fa-solid fa-clock"></i> Create Schedule
+            </a>
+            <a href="{{ url_for('add_department') }}" class="action-btn">
+                <i class="fa-solid fa-building"></i> Add Department
+            </a>
+            <a href="{{ url_for('department_analytics') }}" class="action-btn">
+                <i class="fa-solid fa-chart-pie"></i> Dept Analytics
+            </a>
+        </div>
+    </section>
+
     <!-- ================= DASHBOARD CARDS ================= -->
     <section class="dashboard-cards">
         
@@ -264,38 +378,50 @@
                 <i class="fa-solid fa-calendar-alt"></i>
                 <h3>Scheduling</h3>
                 <p>Manage work schedules and shifts</p>
+                {% if upcoming_shifts > 0 %}
+                <span class="badge-card">{{ upcoming_shifts }} upcoming</span>
+                {% endif %}
             </div>
         </a>
 
         <!-- Leave Management -->
-        <a href="#" class="card-link">
+        <a href="{{ url_for('leave_management') }}" class="card-link">
             <div class="card">
-                <i class="fa-solid fa-calendar-check"></i>
+                <i class="fa-solid fa-umbrella-beach"></i>
                 <h3>Leave Management</h3>
                 <p>Approve and track leave requests</p>
+                {% if pending_leave > 0 %}
+                <span class="badge-card">{{ pending_leave }} pending</span>
+                {% endif %}
             </div>
         </a>
 
         <!-- Attendance Record -->
-        <a href="#" class="card-link">
+        <a href="{{ url_for('attendance_record') }}" class="card-link">
             <div class="card">
                 <i class="fa-solid fa-clipboard-check"></i>
                 <h3>Attendance Record</h3>
                 <p>Track attendance and punctuality</p>
+                {% if late_arrivals > 0 %}
+                <span class="badge-card">{{ late_arrivals }} late</span>
+                {% endif %}
             </div>
         </a>
 
-        <!-- Departments -->
-        <a href="#" class="card-link">
+        <!-- Departments - FIXED LINK -->
+        <a href="{{ url_for('departments') }}" class="card-link">
             <div class="card">
                 <i class="fa-solid fa-sitemap"></i>
                 <h3>Departments</h3>
                 <p>Manage departments and reporting structure</p>
+                {% if departments_count > 0 %}
+                <span class="badge-card">{{ departments_count }} depts</span>
+                {% endif %}
             </div>
         </a>
 
         <!-- Reports -->
-        <a href="#" class="card-link">
+        <a href="{{ url_for('hr_reports') }}" class="card-link">
             <div class="card">
                 <i class="fa-solid fa-chart-bar"></i>
                 <h3>Reports</h3>
@@ -303,9 +429,113 @@
             </div>
         </a>
 
+        <!-- Department Analytics - NEW CARD -->
+        <a href="{{ url_for('department_analytics') }}" class="card-link">
+            <div class="card">
+                <i class="fa-solid fa-chart-pie"></i>
+                <h3>Dept Analytics</h3>
+                <p>View department statistics and insights</p>
+            </div>
+        </a>
+
+        <!-- Export Data - NEW CARD -->
+        <a href="{{ url_for('export_departments') }}" class="card-link">
+            <div class="card">
+                <i class="fa-solid fa-file-export"></i>
+                <h3>Export Data</h3>
+                <p>Download department reports</p>
+            </div>
+        </a>
+
     </section>
 
-    <footer style="text-align: center; padding: 2rem; color: var(--gray); font-size: 0.9rem;">
+    <!-- ================= ADDITIONAL STATS ROW ================= -->
+    <section class="stats-grid" style="margin-top: 2rem;">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, var(--info), #0891b2);">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ pending_leave }}</h3>
+                <p>Pending Leave</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, var(--warning), #d97706);">
+                <i class="fa-solid fa-calendar-week"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ upcoming_shifts }}</h3>
+                <p>Upcoming Shifts</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #ec4899, #db2777);">
+                <i class="fa-solid fa-pen-to-square"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ pending_updates }}</h3>
+                <p>Pending Updates</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #14b8a6, #0d9488);">
+                <i class="fa-solid fa-user-clock"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ late_arrivals }}</h3>
+                <p>Late Today</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= DEPARTMENT SUMMARY ================= -->
+    <section class="stats-grid" style="margin-top: 1rem;">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, var(--primary), #3b5bdb);">
+                <i class="fa-solid fa-building"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ departments_count }}</h3>
+                <p>Total Departments</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, var(--success), #0ca678);">
+                <i class="fa-solid fa-check-circle"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ active_depts if active_depts else departments_count }}</h3>
+                <p>Active Departments</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, var(--purple), #7c3aed);">
+                <i class="fa-solid fa-users"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ avg_staff_per_dept if avg_staff_per_dept else '0' }}</h3>
+                <p>Avg Staff/Dept</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, var(--warning), #d97706);">
+                <i class="fa-solid fa-user-tie"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ dept_heads_count if dept_heads_count else '0' }}</h3>
+                <p>Dept Heads</p>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
         <p>Human Resources Management System | {{ hospital_name }}</p>
         <p>© {{ current_year }} | Version 1.0.0</p>
     </footer>
@@ -314,8 +544,10 @@
         // Set current year in footer
         document.addEventListener('DOMContentLoaded', function() {
             const currentYear = new Date().getFullYear();
-            document.querySelector('footer p:last-child').innerHTML = 
-                `© ${currentYear} | Version 1.0.0`;
+            const footer = document.querySelector('.footer p:last-child');
+            if (footer) {
+                footer.innerHTML = `© ${currentYear} | Version 1.0.0`;
+            }
         });
     </script>
 

@@ -1,382 +1,725 @@
+<!-- templates/shift_swap.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shift Swap | {{ hospital_name }}</title>
-    
-    <!-- Bootstrap 5 CSS -->
+    <title>Shift Swap Management - HR Module</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
     <style>
         :root {
-            --primary: #4361ee;
-            --secondary: #8b5cf6;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --accent-color: #3498db;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+            --light-bg: #f8f9fa;
         }
         
-        .swap-header {
-            background: linear-gradient(135deg, var(--warning), #f08c00);
+        body {
+            background-color: #f4f6f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .navbar-brand {
+            font-weight: 600;
+            color: white !important;
+        }
+        
+        .nav-link {
+            color: rgba(255,255,255,0.9) !important;
+            transition: all 0.3s;
+        }
+        
+        .nav-link:hover {
+            color: white !important;
+            transform: translateY(-2px);
+        }
+        
+        .nav-link.active {
+            color: white !important;
+            font-weight: 600;
+            border-bottom: 2px solid var(--accent-color);
+        }
+        
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            margin-bottom: 25px;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        
+        .card-header {
+            background: white;
+            border-bottom: 2px solid #eef2f7;
+            padding: 1.2rem 1.5rem;
+            border-radius: 15px 15px 0 0 !important;
+        }
+        
+        .card-header h5 {
+            margin: 0;
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+        
+        .btn-primary {
+            background: var(--accent-color);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+        
+        .btn-success {
+            background: var(--success-color);
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+        
+        .btn-warning {
+            background: var(--warning-color);
+            border: none;
             color: white;
-            padding: 2rem 0;
-            margin-bottom: 2rem;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
         }
         
-        .swap-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            border-left: 5px solid var(--warning);
+        .btn-danger {
+            background: var(--danger-color);
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
         }
         
-        .swap-card.pending { border-left-color: var(--warning); }
-        .swap-card.approved { border-left-color: var(--success); }
-        .swap-card.rejected { border-left-color: var(--danger); }
-        
-        .staff-arrow {
-            color: var(--primary);
-            font-size: 1.5rem;
-            margin: 0 1rem;
-        }
-        
-        .request-form {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
-            padding: 2rem;
-        }
-        
-        .status-badge {
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
+        .btn-outline-primary {
+            border: 2px solid var(--accent-color);
+            color: var(--accent-color);
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
             font-weight: 500;
         }
         
-        .badge-pending { background: #fef3c7; color: #92400e; }
-        .badge-approved { background: #d1fae5; color: #065f46; }
-        .badge-rejected { background: #fee2e2; color: #991b1b; }
-        
-        .swap-details {
-            background: #f8fafc;
-            border-radius: 10px;
-            padding: 1rem;
-            margin-top: 1rem;
+        .btn-outline-primary:hover {
+            background: var(--accent-color);
+            color: white;
         }
         
-        .action-buttons {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-approved {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-rejected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .table {
+            margin-bottom: 0;
+        }
+        
+        .table th {
+            background: #f8f9fa;
+            color: var(--primary-color);
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .table td {
+            vertical-align: middle;
+        }
+        
+        .form-label {
+            font-weight: 500;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+        }
+        
+        .form-control, .form-select {
+            border: 2px solid #eef2f7;
+            border-radius: 10px;
+            padding: 10px 15px;
+            transition: all 0.3s;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.1);
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: all 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        
+        .stat-icon {
+            font-size: 2.5rem;
+            color: var(--accent-color);
+            margin-bottom: 10px;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .modal-content {
+            border-radius: 15px;
+            border: none;
+        }
+        
+        .modal-header {
+            background: var(--primary-color);
+            color: white;
+            border-radius: 15px 15px 0 0;
+            padding: 1.2rem 1.5rem;
+        }
+        
+        .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+        }
+        
+        .modal-title {
+            font-weight: 600;
+        }
+        
+        .modal-body {
+            padding: 1.5rem;
+        }
+        
+        .modal-footer {
+            border-top: 2px solid #eef2f7;
+            padding: 1.2rem 1.5rem;
+        }
+        
+        .footer {
+            background: white;
+            padding: 20px 0;
+            text-align: center;
+            color: #7f8c8d;
+            margin-top: 50px;
+            border-top: 1px solid #eef2f7;
+        }
+        
+        .info-icon {
+            color: var(--accent-color);
+            cursor: pointer;
+            margin-left: 5px;
         }
     </style>
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
         <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('scheduling') }}">
-                <i class="fas fa-arrow-left me-2 text-primary"></i>
-                <strong>{{ hospital_name }}</strong> | HR
+            <a class="navbar-brand" href="{{ url_for('hr_dashboard') }}">
+                <i class="bi bi-hospital me-2"></i>Memorial Hospital Ovuru
             </a>
-            <div class="d-flex align-items-center">
-                <span class="me-3 text-muted">
-                    <i class="fas fa-user me-1"></i>
-                    {{ session.get('hr_full_name', 'HR User') }}
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    
+                    
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('scheduling') }}">
+                            <i class="bi bi-calendar-check me-1"></i>Scheduling
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('shift_swap') }}">
+                            <i class="bi bi-arrow-left-right me-1"></i>Shift Swap
+                        </a>
+                    </li>
+                </ul>
+                <span class="navbar-text me-3">
+                    <i class="bi bi-person-circle me-1"></i>{{ session.get('hr_full_name', 'HR User') }}
                 </span>
-                <a href="{{ url_for('hr_logout') }}" class="btn btn-outline-danger btn-sm">
-                    <i class="fas fa-sign-out-alt"></i>
+                <a href="{{ url_for('hr_logout') }}" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-box-arrow-right me-1"></i>Logout
                 </a>
             </div>
         </div>
     </nav>
 
-    <!-- Flash Messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="container mt-3">
-            {% for category, message in messages %}
-            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                <i class="fas fa-{{ 'check-circle' if category == 'success' else 'exclamation-circle' if category == 'warning' else 'info-circle' }} me-2"></i>
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    <div class="container-fluid px-4">
+        <!-- Page Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="mb-1">
+                    <i class="bi bi-arrow-left-right me-2 text-primary"></i>
+                    Shift Swap Management
+                </h4>
+                <p class="text-muted mb-0">Manage and approve shift swap requests from staff members</p>
             </div>
-            {% endfor %}
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#requestSwapModal">
+                <i class="bi bi-plus-circle me-2"></i>New Swap Request
+            </button>
         </div>
-        {% endif %}
-    {% endwith %}
 
-    <!-- Header -->
-    <div class="swap-header">
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col-md-8">
-                    <h1 class="display-5 fw-bold mb-3">
-                        <i class="fas fa-exchange-alt me-3"></i>Shift Swap Management
-                    </h1>
-                    <p class="lead mb-0">Approve or reject shift swap requests</p>
-                </div>
-                <div class="col-md-4 text-end">
-                    <div class="d-inline-block text-start text-dark p-3 rounded" style="background: rgba(255,255,255,0.9);">
-                        <small class="text-muted d-block">Pending Requests</small>
-                        <div class="h2 mb-0">{{ pending_count }}</div>
-                        <small class="text-muted">{{ approved_count }} approved</small>
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="bi bi-hourglass-split"></i>
                     </div>
+                    <div class="stat-value">{{ pending_count }}</div>
+                    <div class="stat-label">Pending Requests</div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Main Content -->
-    <div class="container py-4">
-        
-        <!-- Pending Requests -->
-        <div class="mb-5">
-            <h3 class="mb-4">
-                <i class="fas fa-clock me-2 text-warning"></i>
-                Pending Swap Requests
-                <span class="badge bg-warning ms-2">{{ pending_swaps|length }}</span>
-            </h3>
-            
-            {% if pending_swaps %}
-                {% for swap in pending_swaps %}
-                <div class="swap-card pending">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div>
-                            <h5 class="mb-2">Swap Request #{{ swap[0] }}</h5>
-                            <span class="status-badge badge-pending">
-                                <i class="fas fa-clock me-1"></i>{{ swap[2] }}
-                            </span>
-                            <small class="text-muted ms-3">
-                                <i class="fas fa-calendar me-1"></i>
-                                {{ swap[4].strftime('%b %d, %Y') }} | 
-                                {{ swap[5].strftime('%I:%M %p') }} - {{ swap[6].strftime('%I:%M %p') }}
-                            </small>
-                        </div>
-                        <div class="text-end">
-                            <small class="text-muted d-block">
-                                Requested: {{ swap[3].strftime('%b %d, %I:%M %p') }}
-                            </small>
-                            <small class="text-muted">
-                                By: {{ swap[12] or 'System' }}
-                            </small>
-                        </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="bi bi-check-circle text-success"></i>
                     </div>
-                    
-                    <!-- Staff Swap Details -->
-                    <div class="d-flex align-items-center justify-content-center mb-3">
-                        <div class="text-center p-3 rounded" style="background: #fef3c7; min-width: 200px;">
-                            <h6 class="mb-1">{{ swap[7] }} {{ swap[8] }}</h6>
-                            <small class="text-muted">Current Assignee</small>
-                        </div>
-                        
-                        <div class="staff-arrow">
-                            <i class="fas fa-arrow-right"></i>
-                        </div>
-                        
-                        <div class="text-center p-3 rounded" style="background: #d1fae5; min-width: 200px;">
-                            <h6 class="mb-1">{{ swap[9] }} {{ swap[10] }}</h6>
-                            <small class="text-muted">Requested Replacement</small>
-                        </div>
-                    </div>
-                    
-                    <!-- Reason -->
-                    {% if swap[1] %}
-                    <div class="swap-details">
-                        <strong><i class="fas fa-comment me-2"></i>Reason:</strong>
-                        <p class="mb-0 mt-1">{{ swap[1] }}</p>
-                    </div>
-                    {% endif %}
-                    
-                    <!-- Action Buttons -->
-                    <div class="d-flex justify-content-end mt-3">
-                        <form method="POST" action="{{ url_for('shift_swap') }}" class="action-buttons">
-                            <input type="hidden" name="action" value="approve">
-                            <input type="hidden" name="swap_id" value="{{ swap[0] }}">
-                            <button type="submit" class="btn btn-success" 
-                                    onclick="return confirm('Approve this shift swap?')">
-                                <i class="fas fa-check me-2"></i>Approve
-                            </button>
-                            
-                            <button type="button" class="btn btn-danger" 
-                                    data-bs-toggle="modal" 
-                                    data-bs-target="#rejectModal{{ swap[0] }}">
-                                <i class="fas fa-times me-2"></i>Reject
-                            </button>
-                        </form>
-                    </div>
-                    
-                    <!-- Reject Modal -->
-                    <div class="modal fade" id="rejectModal{{ swap[0] }}" tabindex="-1">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Reject Shift Swap</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <form method="POST" action="{{ url_for('shift_swap') }}">
-                                    <div class="modal-body">
-                                        <input type="hidden" name="action" value="reject">
-                                        <input type="hidden" name="swap_id" value="{{ swap[0] }}">
-                                        
-                                        <div class="mb-3">
-                                            <label class="form-label">Reason for Rejection</label>
-                                            <textarea class="form-control" name="rejection_reason" 
-                                                      rows="3" placeholder="Please provide a reason for rejection..." 
-                                                      required></textarea>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                        <button type="submit" class="btn btn-danger">Reject Request</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
+                    <div class="stat-value">{{ approved_30days }}</div>
+                    <div class="stat-label">Approved (30 days)</div>
                 </div>
-                {% endfor %}
-            {% else %}
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="bi bi-calendar-week text-warning"></i>
+                    </div>
+                    <div class="stat-value">{{ upcoming_schedules|length }}</div>
+                    <div class="stat-label">Upcoming Schedules</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Swap Requests -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-hourglass-split me-2 text-warning"></i>
+                    Pending Swap Requests
+                </h5>
+                <span class="badge bg-warning text-dark">{{ pending_swaps|length }} Pending</span>
+            </div>
+            <div class="card-body">
+                {% if pending_swaps %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Request ID</th>
+                                <th>From Staff</th>
+                                <th>To Staff</th>
+                                <th>Schedule Details</th>
+                                <th>Reason</th>
+                                <th>Requested At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for swap in pending_swaps %}
+                            <tr>
+                                <td><strong>#{{ swap.id }}</strong></td>
+                                <td>
+                                    <strong>{{ swap.from_staff_name }}</strong><br>
+                                    <small class="text-muted">{{ swap.from_staff_position }}</small>
+                                </td>
+                                <td>
+                                    <strong>{{ swap.to_staff_name }}</strong><br>
+                                    <small class="text-muted">{{ swap.to_staff_position }}</small>
+                                </td>
+                                <td>
+                                    <div><strong>{{ swap.schedule_date.strftime('%Y-%m-%d') }}</strong></div>
+                                    <small class="text-muted">
+                                        {{ swap.start_time.strftime('%H:%M') if swap.start_time else 'N/A' }} - 
+                                        {{ swap.end_time.strftime('%H:%M') if swap.end_time else 'N/A' }}
+                                        <br>{{ swap.shift_type or 'Regular' }}
+                                    </small>
+                                </td>
+                                <td>{{ swap.reason or 'No reason provided' }}</td>
+                                <td>{{ swap.requested_at.strftime('%Y-%m-%d %H:%M') if swap.requested_at else 'N/A' }}</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-success btn-sm" 
+                                                onclick="approveSwap({{ swap.id }})">
+                                            <i class="bi bi-check-circle"></i> Approve
+                                        </button>
+                                        <button type="button" class="btn btn-danger btn-sm" 
+                                                onclick="rejectSwap({{ swap.id }})">
+                                            <i class="bi bi-x-circle"></i> Reject
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
                 <div class="text-center py-5">
-                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
-                    <h4>No Pending Requests</h4>
+                    <i class="bi bi-check2-circle text-success" style="font-size: 4rem;"></i>
+                    <h5 class="mt-3">No Pending Swap Requests</h5>
                     <p class="text-muted">All shift swap requests have been processed.</p>
-                </div>
-            {% endif %}
-        </div>
-        
-        <!-- Request New Swap -->
-        <div class="request-form">
-            <h3 class="mb-4">
-                <i class="fas fa-plus-circle me-2 text-primary"></i>
-                Request New Shift Swap
-            </h3>
-            
-            <form method="POST" action="{{ url_for('shift_swap') }}">
-                <input type="hidden" name="action" value="request">
-                
-                <div class="row mb-4">
-                    <div class="col-md-6">
-                        <label class="form-label">Select Schedule to Swap</label>
-                        <select class="form-select" name="schedule_id" required>
-                            <option value="">Choose a schedule...</option>
-                            {% for schedule in upcoming_schedules %}
-                            <option value="{{ schedule[0] }}">
-                                {{ schedule[1].strftime('%b %d') }} | {{ schedule[2].strftime('%I:%M %p') }}-{{ schedule[3].strftime('%I:%M %p') }}
-                                | {{ schedule[5] }} {{ schedule[6] }} ({{ schedule[7] }})
-                                {% if schedule[8] %}| {{ schedule[8] }}{% endif %}
-                            </option>
-                            {% endfor %}
-                        </select>
-                        <div class="form-text">Select the schedule that needs to be swapped</div>
-                    </div>
-                    
-                    <div class="col-md-6">
-                        <label class="form-label">Swap With Staff</label>
-                        <select class="form-select" name="to_staff_id" required>
-                            <option value="">Select replacement staff...</option>
-                            {% for staff in staff_list %}
-                            <option value="{{ staff[0] }}">
-                                {{ staff[1] }} {{ staff[2] }} ({{ staff[3] }})
-                            </option>
-                            {% endfor %}
-                        </select>
-                        <div class="form-text">Choose who will take over this shift</div>
-                    </div>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="form-label">Reason for Swap</label>
-                    <textarea class="form-control" name="reason" rows="3" 
-                              placeholder="Please provide a reason for the shift swap (required)" 
-                              required></textarea>
-                    <div class="form-text">Explain why this swap is needed (e.g., emergency, appointment, etc.)</div>
-                </div>
-                
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    <strong>Note:</strong> The replacement staff will be checked for availability automatically. 
-                    If they have a conflicting schedule, the swap cannot be approved.
-                </div>
-                
-                <div class="d-flex justify-content-end">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-paper-plane me-2"></i>Submit Swap Request
+                    <button type="button" class="btn btn-outline-primary mt-2" data-bs-toggle="modal" data-bs-target="#requestSwapModal">
+                        <i class="bi bi-plus-circle me-2"></i>Create New Request
                     </button>
                 </div>
-            </form>
+                {% endif %}
+            </div>
         </div>
-        
-        <!-- Available Schedules -->
-        <div class="mt-5">
-            <h4 class="mb-3">
-                <i class="fas fa-calendar-alt me-2 text-info"></i>
-                Upcoming Schedules
-            </h4>
-            
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Time</th>
-                            <th>Staff</th>
-                            <th>Position</th>
-                            <th>Shift Type</th>
-                            <th>Department</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for schedule in upcoming_schedules %}
-                        <tr>
-                            <td>{{ schedule[1].strftime('%b %d') }}</td>
-                            <td>{{ schedule[2].strftime('%I:%M %p') }}-{{ schedule[3].strftime('%I:%M %p') }}</td>
-                            <td>{{ schedule[5] }} {{ schedule[6] }}</td>
-                            <td>{{ schedule[7] }}</td>
-                            <td>
-                                {% if schedule[4] %}
-                                <span class="badge bg-info">{{ schedule[4] }}</span>
-                                {% else %}
-                                <span class="badge bg-secondary">Regular</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ schedule[8] or 'N/A' }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+
+        <!-- Upcoming Schedules Available for Swap -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-calendar-week me-2 text-info"></i>
+                    Upcoming Schedules Available for Swap
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if upcoming_schedules %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Staff</th>
+                                <th>Department</th>
+                                <th>Position</th>
+                                <th>Shift Time</th>
+                                <th>Shift Type</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for schedule in upcoming_schedules %}
+                            <tr>
+                                <td>{{ schedule.date.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <strong>{{ schedule.staff_name }}</strong>
+                                </td>
+                                <td>{{ schedule.department or 'N/A' }}</td>
+                                <td>{{ schedule.position }}</td>
+                                <td>
+                                    {{ schedule.start_time.strftime('%H:%M') if schedule.start_time else 'N/A' }} - 
+                                    {{ schedule.end_time.strftime('%H:%M') if schedule.end_time else 'N/A' }}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ schedule.shift_type or 'Regular' }}</span>
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" 
+                                            onclick="requestSwapForSchedule({{ schedule.id }})">
+                                        <i class="bi bi-arrow-left-right"></i> Request Swap
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
+                    <p class="mt-3">No upcoming schedules found.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Swap Request History -->
+        {% if swap_history %}
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history me-2 text-secondary"></i>
+                    Swap Request History
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Request ID</th>
+                                <th>From → To</th>
+                                <th>Schedule Date</th>
+                                <th>Status</th>
+                                <th>Requested</th>
+                                <th>Processed</th>
+                                <th>Reason/Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for swap in swap_history %}
+                            <tr>
+                                <td>#{{ swap.id }}</td>
+                                <td>
+                                    <small>{{ swap.from_staff_name }}</small><br>
+                                    <i class="bi bi-arrow-right"></i><br>
+                                    <small>{{ swap.to_staff_name }}</small>
+                                </td>
+                                <td>{{ swap.schedule_date.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <span class="status-badge status-{{ swap.status.lower() }}">
+                                        {{ swap.status }}
+                                    </span>
+                                </td>
+                                <td>{{ swap.requested_at.strftime('%Y-%m-%d') if swap.requested_at else 'N/A' }}</td>
+                                <td>
+                                    {% if swap.approved_at %}
+                                        {{ swap.approved_at.strftime('%Y-%m-%d') }}
+                                    {% elif swap.reviewed_at %}
+                                        {{ swap.reviewed_at.strftime('%Y-%m-%d') }}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if swap.status == 'Rejected' and swap.rejection_reason %}
+                                        <span class="text-danger">{{ swap.rejection_reason }}</span>
+                                    {% elif swap.reason %}
+                                        {{ swap.reason|truncate(50) }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Request Swap Modal -->
+    <div class="modal fade" id="requestSwapModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-arrow-left-right me-2"></i>
+                        Request Shift Swap
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="{{ url_for('shift_swap') }}" method="POST">
+                    <input type="hidden" name="action" value="request">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Select Schedule to Swap <span class="text-danger">*</span></label>
+                            <select class="form-select" name="schedule_id" required>
+                                <option value="">Choose schedule...</option>
+                                {% for schedule in upcoming_schedules %}
+                                <option value="{{ schedule.id }}">
+                                    {{ schedule.date.strftime('%Y-%m-%d') }} - 
+                                    {{ schedule.staff_name }} ({{ schedule.department }})
+                                    [{{ schedule.start_time.strftime('%H:%M') if schedule.start_time else 'N/A' }} - 
+                                    {{ schedule.end_time.strftime('%H:%M') if schedule.end_time else 'N/A' }}]
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">From Staff (Current Schedule Owner) <span class="text-danger">*</span></label>
+                            <select class="form-select" name="from_staff_id" required>
+                                <option value="">Select staff...</option>
+                                {% for staff in staff_list %}
+                                <option value="{{ staff.id }}">
+                                    {{ staff.name }} - {{ staff.position }} ({{ staff.department }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">To Staff (Swap With) <span class="text-danger">*</span></label>
+                            <select class="form-select" name="to_staff_id" required>
+                                <option value="">Select staff...</option>
+                                {% for staff in staff_list %}
+                                <option value="{{ staff.id }}">
+                                    {{ staff.name }} - {{ staff.position }} ({{ staff.department }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Reason for Swap</label>
+                            <textarea class="form-control" name="reason" rows="3" 
+                                      placeholder="Please provide reason for the swap request..."></textarea>
+                            <small class="text-muted">This will help in the approval process</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-send me-2"></i>Submit Request
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
-    <!-- Bootstrap JS Bundle with Popper -->
+    <!-- Approve Swap Modal -->
+    <div class="modal fade" id="approveSwapModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-check-circle me-2"></i>
+                        Approve Swap Request
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="{{ url_for('shift_swap') }}" method="POST">
+                    <input type="hidden" name="action" value="approve">
+                    <input type="hidden" name="swap_id" id="approve_swap_id">
+                    <div class="modal-body">
+                        <p>Are you sure you want to approve this swap request?</p>
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            This will permanently change the schedule assignment. This action cannot be undone.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle me-2"></i>Approve Swap
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reject Swap Modal -->
+    <div class="modal fade" id="rejectSwapModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-x-circle me-2"></i>
+                        Reject Swap Request
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="{{ url_for('shift_swap') }}" method="POST">
+                    <input type="hidden" name="action" value="reject">
+                    <input type="hidden" name="swap_id" id="reject_swap_id">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Reason for Rejection <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="rejection_reason" rows="3" required 
+                                      placeholder="Please provide a reason for rejection..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-x-circle me-2"></i>Reject Request
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p class="mb-0">&copy; {{ current_year }} Memorial Hospital Ovuru, Nsukka, Enugu State. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    
     <script>
-        // Auto-close flash messages
-        setTimeout(function() {
-            $('.alert').alert('close');
-        }, 5000);
+        function approveSwap(swapId) {
+            document.getElementById('approve_swap_id').value = swapId;
+            var modal = new bootstrap.Modal(document.getElementById('approveSwapModal'));
+            modal.show();
+        }
         
-        // Form validation for swap request
-        document.querySelector('form').addEventListener('submit', function(e) {
-            const scheduleSelect = document.querySelector('select[name="schedule_id"]');
-            const staffSelect = document.querySelector('select[name="to_staff_id"]');
-            const reasonText = document.querySelector('textarea[name="reason"]');
-            
-            if (!scheduleSelect.value || !staffSelect.value || !reasonText.value.trim()) {
-                e.preventDefault();
-                alert('Please fill in all required fields');
-                return false;
+        function rejectSwap(swapId) {
+            document.getElementById('reject_swap_id').value = swapId;
+            var modal = new bootstrap.Modal(document.getElementById('rejectSwapModal'));
+            modal.show();
+        }
+        
+        function requestSwapForSchedule(scheduleId) {
+            var modal = new bootstrap.Modal(document.getElementById('requestSwapModal'));
+            var scheduleSelect = document.querySelector('select[name="schedule_id"]');
+            if (scheduleSelect) {
+                scheduleSelect.value = scheduleId;
             }
-            
-            return true;
-        });
+            modal.show();
+        }
+        
+        // Show flash messages as toasts
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    alert('{{ message }}');
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
     </script>
 </body>
 </html>

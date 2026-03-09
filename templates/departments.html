@@ -1,0 +1,549 @@
+<!-- templates/departments.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Department Management - HR Module</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3b5bdb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #06b6d4;
+            --purple: #8b5cf6;
+            --dark: #1e293b;
+            --gray: #64748b;
+            --light: #f8fafc;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            color: var(--dark);
+            padding-top: 80px;
+            margin: 0;
+        }
+        
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            padding: 1rem 2rem;
+        }
+        
+        .navbar-brand {
+            font-weight: 600;
+            color: var(--primary) !important;
+        }
+        
+        .nav-link {
+            color: var(--dark) !important;
+            font-weight: 500;
+        }
+        
+        .nav-link:hover {
+            color: var(--primary) !important;
+        }
+        
+        .nav-link.active {
+            color: var(--primary) !important;
+            border-bottom: 2px solid var(--primary);
+        }
+        
+        .logout-btn {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+            color: #fff;
+            padding: 0.4rem 1rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            height: 100%;
+            transition: transform 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            margin-bottom: 1rem;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 0.2rem;
+        }
+        
+        .stat-label {
+            color: var(--gray);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .department-card {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .department-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(67, 97, 238, 0.15);
+        }
+        
+        .department-card.active {
+            border-left: 4px solid var(--success);
+        }
+        
+        .department-card.inactive {
+            border-left: 4px solid var(--danger);
+            opacity: 0.8;
+        }
+        
+        .department-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 1rem;
+        }
+        
+        .department-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--dark);
+            margin: 0;
+        }
+        
+        .department-code {
+            background: var(--light);
+            padding: 0.2rem 0.5rem;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .department-head {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 1rem 0;
+            padding: 0.5rem;
+            background: var(--light);
+            border-radius: 10px;
+        }
+        
+        .head-icon {
+            width: 35px;
+            height: 35px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .head-info {
+            flex: 1;
+        }
+        
+        .head-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin: 0;
+        }
+        
+        .head-title {
+            font-size: 0.8rem;
+            color: var(--gray);
+            margin: 0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 0.5rem;
+            background: var(--light);
+            border-radius: 8px;
+        }
+        
+        .stat-number {
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .stat-text {
+            font-size: 0.75rem;
+            color: var(--gray);
+        }
+        
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(67, 97, 238, 0.3);
+        }
+        
+        .btn-outline-primary {
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-weight: 500;
+        }
+        
+        .btn-outline-primary:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--gray);
+            font-size: 0.9rem;
+            margin-top: 3rem;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        .action-btn {
+            flex: 1;
+            padding: 0.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .view-btn {
+            background: var(--light);
+            color: var(--dark);
+        }
+        
+        .view-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .edit-btn {
+            background: var(--light);
+            color: var(--warning);
+        }
+        
+        .edit-btn:hover {
+            background: var(--warning);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('hr_dashboard') }}">
+                <i class="fas fa-hospital me-2"></i>HR Management
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('hr_dashboard') }}">
+                            <i class="fas fa-dashboard me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('departments') }}">
+                            <i class="fas fa-sitemap me-1"></i>Departments
+                        </a>
+                    </li>
+                </ul>
+                <span class="me-3">
+                    <i class="fas fa-user-circle me-1"></i>{{ session.get('hr_full_name', 'HR User') }}
+                </span>
+                <a href="{{ url_for('hr_logout') }}" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div>
+                <h4 class="mb-1">
+                    <i class="fas fa-sitemap me-2 text-primary"></i>
+                    Department Management
+                </h4>
+                <p class="text-muted mb-0">Manage hospital departments, heads, and organizational structure</p>
+            </div>
+            <div>
+                <a href="{{ url_for('department_analytics') }}" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-chart-pie me-2"></i>Analytics
+                </a>
+                <a href="{{ url_for('export_departments') }}" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-download me-2"></i>Export
+                </a>
+                <a href="{{ url_for('add_department') }}" class="btn btn-primary">
+                    <i class="fas fa-plus-circle me-2"></i>New Department
+                </a>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-building"></i>
+                    </div>
+                    <div class="stat-value">{{ departments|length }}</div>
+                    <div class="stat-label">Total Departments</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, var(--success), #0ca678);">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-value">{{ active_depts }}</div>
+                    <div class="stat-label">Active Departments</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, var(--purple), #7c3aed);">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-value">{{ staff_with_dept }}</div>
+                    <div class="stat-label">Staff with Department</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Department Grid -->
+        <div class="row">
+            {% for dept in departments %}
+            <div class="col-xl-4 col-md-6 mb-4">
+                <div class="department-card {% if dept.status == 'Active' %}active{% else %}inactive{% endif %}">
+                    <div class="department-header">
+                        <div>
+                            <h5 class="department-name">{{ dept.name }}</h5>
+                            <span class="department-code">{{ dept.code }}</span>
+                        </div>
+                        <span class="status-badge {% if dept.status == 'Active' %}status-active{% else %}status-inactive{% endif %}">
+                            {{ dept.status }}
+                        </span>
+                    </div>
+                    
+                    <div class="department-head">
+                        <div class="head-icon">
+                            <i class="fas fa-user-tie"></i>
+                        </div>
+                        <div class="head-info">
+                            <p class="head-name">{{ dept.head_of_dept }}</p>
+                            <p class="head-title">Department Head</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-number">{{ dept.staff_count }}</div>
+                            <div class="stat-text">Total Staff</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">{{ dept.active_staff }}</div>
+                            <div class="stat-text">Active</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">{{ dept.attendance_rate }}%</div>
+                            <div class="stat-text">Attendance</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-number">{{ dept.total_shifts }}</div>
+                            <div class="stat-text">Shifts</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">{{ dept.attendance_count }}</div>
+                            <div class="stat-text">Present Today</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">{{ dept.created_at.strftime('%Y') }}</div>
+                            <div class="stat-text">Est.</div>
+                        </div>
+                    </div>
+                    
+                    <div class="action-buttons">
+                        <a href="{{ url_for('view_department', department_id=dept.id) }}" class="action-btn view-btn">
+                            <i class="fas fa-eye me-1"></i> View
+                        </a>
+                        <a href="{{ url_for('edit_department', department_id=dept.id) }}" class="action-btn edit-btn">
+                            <i class="fas fa-edit me-1"></i> Edit
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Department Distribution Chart -->
+        {% if chart_data %}
+        <div class="chart-container">
+            <h5 class="mb-3">
+                <i class="fas fa-chart-bar me-2 text-primary"></i>
+                Staff Distribution by Department
+            </h5>
+            <div style="height: 300px;">
+                <canvas id="deptChart"></canvas>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>&copy; {{ current_year }} Memorial Hospital Ovuru, Nsukka, Enugu State. All rights reserved.</p>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    {% if chart_data %}
+    <script>
+        // Department Distribution Chart
+        const ctx = document.getElementById('deptChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [{% for item in chart_data %}'{{ item[0] }}',{% endfor %}],
+                datasets: [{
+                    label: 'Number of Staff',
+                    data: [{% for item in chart_data %}{{ item[1] }},{% endfor %}],
+                    backgroundColor: 'rgba(67, 97, 238, 0.8)',
+                    borderColor: 'rgba(67, 97, 238, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    </script>
+    {% endif %}
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <script>
+                alert('{{ message }}');
+            </script>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+</body>
+</html>

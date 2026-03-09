@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Department - {{ department.name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3b5bdb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #06b6d4;
+            --purple: #8b5cf6;
+            --dark: #1e293b;
+            --gray: #64748b;
+            --light: #f8fafc;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            color: var(--dark);
+            padding-top: 80px;
+            margin: 0;
+        }
+        
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            padding: 1rem 2rem;
+        }
+        
+        .navbar-brand {
+            font-weight: 600;
+            color: var(--primary) !important;
+        }
+        
+        .nav-link {
+            color: var(--dark) !important;
+            font-weight: 500;
+        }
+        
+        .logout-btn {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+            color: #fff;
+            padding: 0.4rem 1rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .department-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .department-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 15px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+        
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .info-card {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            height: 100%;
+            margin-bottom: 1.5rem;
+        }
+        
+        .info-label {
+            color: var(--gray);
+            font-size: 0.85rem;
+            margin-bottom: 0.2rem;
+        }
+        
+        .info-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-number {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .stat-label {
+            color: var(--gray);
+            font-size: 0.85rem;
+        }
+        
+        .table th {
+            background: #f8fafc;
+            color: var(--dark);
+            font-weight: 600;
+        }
+        
+        .table td {
+            vertical-align: middle;
+        }
+        
+        .staff-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(67, 97, 238, 0.3);
+        }
+        
+        .btn-outline-primary {
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+        }
+        
+        .btn-outline-primary:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--gray);
+            font-size: 0.9rem;
+            margin-top: 3rem;
+        }
+        
+        .nav-tabs .nav-link {
+            color: var(--dark);
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-weight: 500;
+        }
+        
+        .nav-tabs .nav-link.active {
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+            background: transparent;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('hr_dashboard') }}">
+                <i class="fas fa-hospital me-2"></i>HR Management
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('hr_dashboard') }}">
+                            <i class="fas fa-dashboard me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('departments') }}">
+                            <i class="fas fa-sitemap me-1"></i>Departments
+                        </a>
+                    </li>
+                </ul>
+                <span class="me-3">
+                    <i class="fas fa-user-circle me-1"></i>{{ session.get('hr_full_name', 'HR User') }}
+                </span>
+                <a href="{{ url_for('hr_logout') }}" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="department-title">
+                <div class="department-icon">
+                    <i class="fas fa-building"></i>
+                </div>
+                <div>
+                    <h4 class="mb-1">{{ department.name }}</h4>
+                    <p class="text-muted mb-0">
+                        <i class="fas fa-code me-1"></i>{{ department.code }} | 
+                        <span class="status-badge {% if department.status == 'Active' %}status-active{% else %}status-inactive{% endif %}">
+                            {{ department.status }}
+                        </span>
+                    </p>
+                </div>
+            </div>
+            <div>
+                <a href="{{ url_for('edit_department', department_id=department.id) }}" class="btn btn-primary me-2">
+                    <i class="fas fa-edit me-2"></i>Edit Department
+                </a>
+                <a href="{{ url_for('departments') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Departments
+                </a>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-number">{{ department.total_staff }}</div>
+                    <div class="stat-label">Total Staff</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-number" style="color: var(--success);">{{ department.active_staff }}</div>
+                    <div class="stat-label">Active Staff</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-number" style="color: var(--warning);">{{ department.upcoming_shifts }}</div>
+                    <div class="stat-label">Upcoming Shifts</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-number" style="color: var(--info);">{{ department.pending_leaves }}</div>
+                    <div class="stat-label">Pending Leaves</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Department Info Tabs -->
+        <ul class="nav nav-tabs mb-4" id="deptTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab">
+                    <i class="fas fa-info-circle me-2"></i>Overview
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="staff-tab" data-bs-toggle="tab" data-bs-target="#staff" type="button" role="tab">
+                    <i class="fas fa-users me-2"></i>Staff ({{ staff_list|length }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="attendance-tab" data-bs-toggle="tab" data-bs-target="#attendance" type="button" role="tab">
+                    <i class="fas fa-clock me-2"></i>Attendance
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="schedules-tab" data-bs-toggle="tab" data-bs-target="#schedules" type="button" role="tab">
+                    <i class="fas fa-calendar me-2"></i>Schedules
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="leaves-tab" data-bs-toggle="tab" data-bs-target="#leaves" type="button" role="tab">
+                    <i class="fas fa-umbrella-beach me-2"></i>Leave Requests
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="deptTabsContent">
+            <!-- Overview Tab -->
+            <div class="tab-pane fade show active" id="overview" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="info-card">
+                            <h5 class="mb-3"><i class="fas fa-info-circle me-2 text-primary"></i>Department Information</h5>
+                            <div class="row mb-3">
+                                <div class="col-4">
+                                    <div class="info-label">Department Name</div>
+                                    <div class="info-value">{{ department.name }}</div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="info-label">Department Code</div>
+                                    <div class="info-value">{{ department.code }}</div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="info-label">Status</div>
+                                    <div class="info-value">
+                                        <span class="status-badge {% if department.status == 'Active' %}status-active{% else %}status-inactive{% endif %}">
+                                            {{ department.status }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="info-label">Department Head</div>
+                                <div class="info-value">
+                                    {% if department.head_of_dept != 'Not assigned' %}
+                                        <i class="fas fa-user-tie me-2 text-primary"></i>{{ department.head_of_dept }}
+                                    {% else %}
+                                        <span class="text-muted">Not assigned</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="info-label">Description</div>
+                                <div class="info-value">{{ department.description }}</div>
+                            </div>
+                            <div>
+                                <div class="info-label">Created Date</div>
+                                <div class="info-value">{{ department.created_at.strftime('%B %d, %Y') if department.created_at else 'N/A' }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="info-card">
+                            <h5 class="mb-3"><i class="fas fa-chart-pie me-2 text-primary"></i>Department Statistics</h5>
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <div class="info-label">Average Salary</div>
+                                    <div class="info-value">₦{{ "%.2f"|format(avg_salary) }}</div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="info-label">Gender Distribution</div>
+                                    <div class="info-value">
+                                        <span class="badge bg-info me-2">M: {{ male_count }}</span>
+                                        <span class="badge bg-danger">F: {{ female_count }}</span>
+                                    </div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="info-label">Oldest Employee</div>
+                                    <div class="info-value">
+                                        {% if oldest_employee %}
+                                            {{ oldest_employee.strftime('%B %d, %Y') }}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="info-label">Staff Turnover</div>
+                                    <div class="info-value">{{ "%.1f"|format((department.total_staff - department.active_staff) / department.total_staff * 100 if department.total_staff > 0 else 0) }}%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Staff Tab -->
+            <div class="tab-pane fade" id="staff" role="tabpanel">
+                <div class="info-card">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0"><i class="fas fa-users me-2 text-primary"></i>Staff Members</h5>
+                        <span class="badge bg-primary">{{ staff_list|length }} Total</span>
+                    </div>
+                    {% if staff_list %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Staff ID</th>
+                                    <th>Name</th>
+                                    <th>Position</th>
+                                    <th>Contact</th>
+                                    <th>Status</th>
+                                    <th>Hire Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for staff in staff_list %}
+                                <tr>
+                                    <td><span class="badge bg-light">{{ staff.staff_id }}</span></td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="staff-avatar me-2">
+                                                <i class="fas fa-user"></i>
+                                            </div>
+                                            <strong>{{ staff.name }}</strong>
+                                        </div>
+                                    </td>
+                                    <td>{{ staff.position }}</td>
+                                    <td>
+                                        <small>{{ staff.email }}<br>{{ staff.phone }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge {% if staff.status == 'Active' %}status-active{% else %}status-inactive{% endif %}">
+                                            {{ staff.status }}
+                                        </span>
+                                    </td>
+                                    <td>{{ staff.hire_date.strftime('%Y-%m-%d') if staff.hire_date else 'N/A' }}</td>
+                                    <td>
+                                        <a href="{{ url_for('view_staff', staff_id=staff.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-users text-muted" style="font-size: 3rem;"></i>
+                        <p class="mt-3">No staff members in this department</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Attendance Tab -->
+            <div class="tab-pane fade" id="attendance" role="tabpanel">
+                <div class="info-card">
+                    <h5 class="mb-3"><i class="fas fa-clock me-2 text-primary"></i>Last 7 Days Attendance</h5>
+                    {% if weekly_attendance %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Present</th>
+                                    <th>Late</th>
+                                    <th>Absent</th>
+                                    <th>Half Day</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for day in weekly_attendance %}
+                                <tr>
+                                    <td><strong>{{ day.date.strftime('%A, %b %d') }}</strong></td>
+                                    <td><span class="badge bg-success">{{ day.present }}</span></td>
+                                    <td><span class="badge bg-warning">{{ day.late }}</span></td>
+                                    <td><span class="badge bg-danger">{{ day.absent }}</span></td>
+                                    <td><span class="badge bg-info">{{ day.half_day }}</span></td>
+                                    <td><span class="badge bg-secondary">{{ day.total }}</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-clock text-muted" style="font-size: 3rem;"></i>
+                        <p class="mt-3">No attendance data available</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Schedules Tab -->
+            <div class="tab-pane fade" id="schedules" role="tabpanel">
+                <div class="info-card">
+                    <h5 class="mb-3"><i class="fas fa-calendar me-2 text-primary"></i>Upcoming Schedules (Next 7 Days)</h5>
+                    {% if upcoming_schedules %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Staff</th>
+                                    <th>Position</th>
+                                    <th>Shift Time</th>
+                                    <th>Shift Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for schedule in upcoming_schedules %}
+                                <tr>
+                                    <td><strong>{{ schedule.date.strftime('%Y-%m-%d') }}</strong></td>
+                                    <td>{{ schedule.staff_name }}</td>
+                                    <td>{{ schedule.position }}</td>
+                                    <td>
+                                        {% if schedule.start_time and schedule.end_time %}
+                                            {{ schedule.start_time.strftime('%H:%M') }} - {{ schedule.end_time.strftime('%H:%M') }}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="badge bg-info">{{ schedule.shift_type }}</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-calendar text-muted" style="font-size: 3rem;"></i>
+                        <p class="mt-3">No upcoming schedules</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Leave Requests Tab -->
+            <div class="tab-pane fade" id="leaves" role="tabpanel">
+                <div class="info-card">
+                    <h5 class="mb-3"><i class="fas fa-umbrella-beach me-2 text-primary"></i>Pending Leave Requests</h5>
+                    {% if leave_requests %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Staff</th>
+                                    <th>Leave Type</th>
+                                    <th>Period</th>
+                                    <th>Days</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for leave in leave_requests %}
+                                <tr>
+                                    <td>{{ leave.staff_name }}</td>
+                                    <td>{{ leave.type }}</td>
+                                    <td>{{ leave.start_date.strftime('%Y-%m-%d') }} to {{ leave.end_date.strftime('%Y-%m-%d') }}</td>
+                                    <td><span class="badge bg-info">{{ leave.days }}</span></td>
+                                    <td><span class="badge bg-warning">{{ leave.status }}</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
+                        <p class="mt-3">No pending leave requests</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>&copy; {{ current_year }} Memorial Hospital Ovuru, Nsukka, Enugu State. All rights reserved.</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <script>
+                alert('{{ message }}');
+            </script>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+</body>
+</html>

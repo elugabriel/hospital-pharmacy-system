@@ -1,0 +1,236 @@
+<!-- templates/leave_calendar.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leave Calendar - HR Module</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f4f6f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+        }
+        
+        .calendar-weekday {
+            text-align: center;
+            font-weight: 600;
+            color: #2c3e50;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .calendar-day {
+            min-height: 120px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 10px;
+            transition: all 0.3s;
+        }
+        
+        .calendar-day:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .calendar-day.empty {
+            background: #e9ecef;
+            opacity: 0.5;
+        }
+        
+        .day-number {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .leave-item {
+            background: #3498db;
+            color: white;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-bottom: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .leave-item:hover {
+            transform: translateX(2px);
+            opacity: 0.9;
+        }
+        
+        .leave-item.pending {
+            background: #f39c12;
+        }
+        
+        .leave-item.approved {
+            background: #27ae60;
+        }
+        
+        .modal-content {
+            border-radius: 15px;
+        }
+        
+        .modal-header {
+            background: #2c3e50;
+            color: white;
+            border-radius: 15px 15px 0 0;
+        }
+        
+        .footer {
+            background: white;
+            padding: 20px 0;
+            text-align: center;
+            color: #7f8c8d;
+            margin-top: 50px;
+            border-top: 1px solid #eef2f7;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('hr_dashboard') }}">
+                <i class="bi bi-hospital me-2"></i>Memorial Hospital Ovuru
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('leave_management') }}">
+                            <i class="bi bi-arrow-left me-1"></i>Back to Leave Management
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="calendar-header">
+            <h4>
+                <i class="bi bi-calendar-month me-2 text-primary"></i>
+                Leave Calendar - {{ start_date.strftime('%B %Y') }}
+            </h4>
+            <form method="GET" class="d-flex gap-2">
+                <select name="month" class="form-select" style="width: auto;">
+                    {% for m_num, m_name in months %}
+                    <option value="{{ m_num }}" {% if month == m_num %}selected{% endif %}>{{ m_name }}</option>
+                    {% endfor %}
+                </select>
+                <select name="year" class="form-select" style="width: auto;">
+                    {% for y in years %}
+                    <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary">Go</button>
+            </form>
+        </div>
+
+        <div class="calendar-grid">
+            <div class="calendar-weekday">Sun</div>
+            <div class="calendar-weekday">Mon</div>
+            <div class="calendar-weekday">Tue</div>
+            <div class="calendar-weekday">Wed</div>
+            <div class="calendar-weekday">Thu</div>
+            <div class="calendar-weekday">Fri</div>
+            <div class="calendar-weekday">Sat</div>
+            
+            {% set start_weekday = start_date.weekday() %}
+            {% set days_in_month = (end_date - start_date).days + 1 %}
+            
+            {# Empty cells for days before month starts #}
+            {% for i in range((start_weekday + 1) % 7) %}
+            <div class="calendar-day empty"></div>
+            {% endfor %}
+            
+            {# Calendar days #}
+            {% for day in range(1, days_in_month + 1) %}
+                {% set current_date = start_date.replace(day=day) %}
+                {% set date_str = current_date.strftime('%Y-%m-%d') %}
+                
+                <div class="calendar-day">
+                    <div class="day-number">{{ day }}</div>
+                    {% if date_str in calendar_data %}
+                        {% for leave in calendar_data[date_str] %}
+                        <div class="leave-item {{ leave.status.lower() }}" 
+                             onclick="showLeaveDetails('{{ leave.staff_name }}', '{{ leave.type }}', '{{ leave.status }}', '{{ leave.position }}', '{{ leave.department }}')">
+                            {{ leave.staff_name.split()[0] }} - {{ leave.type[:10] }}
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Leave Details Modal -->
+    <div class="modal fade" id="leaveDetailsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Leave Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="leaveDetailsBody">
+                    <!-- Filled by JavaScript -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p class="mb-0">&copy; {{ current_year }} Memorial Hospital Ovuru, Nsukka, Enugu State. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function showLeaveDetails(staffName, leaveType, status, position, department) {
+            const modalBody = document.getElementById('leaveDetailsBody');
+            modalBody.innerHTML = `
+                <p><strong>Staff:</strong> ${staffName}</p>
+                <p><strong>Position:</strong> ${position}</p>
+                <p><strong>Department:</strong> ${department}</p>
+                <p><strong>Leave Type:</strong> ${leaveType}</p>
+                <p><strong>Status:</strong> <span class="badge bg-${status === 'Approved' ? 'success' : 'warning'}">${status}</span></p>
+            `;
+            var modal = new bootstrap.Modal(document.getElementById('leaveDetailsModal'));
+            modal.show();
+        }
+    </script>
+</body>
+</html>

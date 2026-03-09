@@ -1,509 +1,424 @@
+<!-- templates/schedule_reports.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Schedule Reports | {{ hospital_name }}</title>
-    
-    <!-- Bootstrap 5 CSS -->
+    <title>Schedule Reports - HR Module</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
     <style>
-        :root {
-            --primary: #4361ee;
-            --secondary: #8b5cf6;
-            --success: #10b981;
-            --info: #06b6d4;
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         
-        .reports-header {
-            background: linear-gradient(135deg, var(--info), #0891b2);
-            color: white;
-            padding: 2rem 0;
-            margin-bottom: 2rem;
+        .navbar {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
-        .report-card {
+        .navbar-brand {
+            font-weight: 600;
+            color: white !important;
+        }
+        
+        .nav-link {
+            color: rgba(255,255,255,0.9) !important;
+        }
+        
+        .nav-link:hover {
+            color: white !important;
+        }
+        
+        .nav-link.active {
+            color: white !important;
+            font-weight: 600;
+            border-bottom: 2px solid #3498db;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            margin-bottom: 25px;
+        }
+        
+        .card-header {
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
+            border-bottom: 2px solid #eef2f7;
+            padding: 1.2rem 1.5rem;
+            border-radius: 15px 15px 0 0 !important;
         }
         
-        .filter-form {
-            background: #f8fafc;
-            border-radius: 15px;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
+        .card-header h5 {
+            margin: 0;
+            color: #2c3e50;
+            font-weight: 600;
         }
         
         .stat-card {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: white;
+            background: white;
             border-radius: 15px;
-            padding: 1.5rem;
+            padding: 20px;
             text-align: center;
-            margin-bottom: 1rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            height: 100%;
         }
         
-        .stat-number {
+        .stat-icon {
             font-size: 2.5rem;
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
             font-weight: 700;
-            line-height: 1;
+            color: #2c3e50;
+            margin-bottom: 5px;
         }
         
-        .chart-container {
-            background: white;
-            border-radius: 15px;
-            padding: 1.5rem;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
-            margin-bottom: 1.5rem;
-        }
-        
-        .report-table {
-            background: white;
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
-        }
-        
-        .report-table th {
-            background: var(--primary);
-            color: white;
-            border: none;
-        }
-        
-        .tab-button {
-            background: none;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            color: var(--primary);
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 0.9rem;
             font-weight: 500;
-            border-radius: 10px;
-            transition: all 0.3s;
         }
         
-        .tab-button.active {
-            background: var(--primary);
+        .table th {
+            background: #f8f9fa;
+            color: #2c3e50;
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .table td {
+            vertical-align: middle;
+        }
+        
+        .filter-form {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .btn-primary {
+            background: #3498db;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        
+        .btn-outline-primary {
+            border: 2px solid #3498db;
+            color: #3498db;
+            border-radius: 8px;
+            padding: 8px 20px;
+            font-weight: 500;
+        }
+        
+        .btn-outline-primary:hover {
+            background: #3498db;
             color: white;
         }
         
-        .tab-button:hover:not(.active) {
-            background: rgba(67, 97, 238, 0.1);
+        .badge-report {
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            font-weight: 500;
         }
         
-        .empty-state {
+        .footer {
+            background: white;
+            padding: 20px 0;
             text-align: center;
-            padding: 3rem;
-            color: #64748b;
-        }
-        
-        .empty-state i {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-            opacity: 0.3;
+            color: #7f8c8d;
+            margin-top: 50px;
+            border-top: 1px solid #eef2f7;
         }
     </style>
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
         <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('scheduling') }}">
-                <i class="fas fa-arrow-left me-2 text-primary"></i>
-                <strong>{{ hospital_name }}</strong> | HR
+            <a class="navbar-brand" href="{{ url_for('hr_dashboard') }}">
+                <i class="bi bi-hospital me-2"></i>Memorial Hospital Ovuru
             </a>
-            <div class="d-flex align-items-center">
-                <span class="me-3 text-muted">
-                    <i class="fas fa-user me-1"></i>
-                    {{ session.get('hr_full_name', 'HR User') }}
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('scheduling') }}">
+                            <i class="bi bi-calendar-check me-1"></i>Scheduling
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('schedule_reports') }}">
+                            <i class="bi bi-bar-chart me-1"></i>Reports
+                        </a>
+                    </li>
+                </ul>
+                <span class="navbar-text me-3">
+                    <i class="bi bi-person-circle me-1"></i>{{ session.get('hr_full_name', 'HR User') }}
                 </span>
-                <a href="{{ url_for('hr_logout') }}" class="btn btn-outline-danger btn-sm">
-                    <i class="fas fa-sign-out-alt"></i>
+                <a href="{{ url_for('hr_logout') }}" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-box-arrow-right me-1"></i>Logout
                 </a>
             </div>
         </div>
     </nav>
 
-    <!-- Header -->
-    <div class="reports-header">
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col-md-8">
-                    <h1 class="display-5 fw-bold mb-3">
-                        <i class="fas fa-chart-bar me-3"></i>Schedule Reports
-                    </h1>
-                    <p class="lead mb-0">Generate and analyze scheduling data</p>
-                </div>
-                <div class="col-md-4 text-end">
-                    <div class="stat-card d-inline-block">
-                        <div class="stat-number">{{ total_shifts }}</div>
-                        <small>Total Shifts</small>
+    <div class="container-fluid px-4">
+        <!-- Page Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="mb-0">
+                <i class="bi bi-bar-chart me-2 text-primary"></i>
+                Schedule Reports
+            </h4>
+        </div>
+
+        <!-- Filter Form -->
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('schedule_reports') }}" class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Report Type</label>
+                        <select name="report_type" class="form-select">
+                            <option value="monthly" {% if report_type == 'monthly' %}selected{% endif %}>Monthly Summary</option>
+                            <option value="weekly" {% if report_type == 'weekly' %}selected{% endif %}>Weekly Schedule</option>
+                            <option value="coverage" {% if report_type == 'coverage' %}selected{% endif %}>Coverage Analysis</option>
+                        </select>
                     </div>
-                </div>
+                    
+                    {% if report_type != 'weekly' %}
+                    <div class="col-md-2">
+                        <label class="form-label">Month</label>
+                        <select name="month" class="form-select">
+                            {% for m_num, m_name in months %}
+                            <option value="{{ m_num }}" {% if selected_month == m_num %}selected{% endif %}>{{ m_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-2">
+                        <label class="form-label">Year</label>
+                        <select name="year" class="form-select">
+                            {% for y in years %}
+                            <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="col-md-3">
+                        <label class="form-label">Department</label>
+                        <select name="department_id" class="form-select">
+                            <option value="">All Departments</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept[0] }}" {% if selected_department|int == dept[0] %}selected{% endif %}>{{ dept[1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-filter me-2"></i>Generate Report
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
-    </div>
 
-    <!-- Main Content -->
-    <div class="container py-4">
-        
-        <!-- Report Type Tabs -->
-        <div class="d-flex gap-2 mb-4">
-            <button class="tab-button {% if report_type == 'monthly' %}active{% endif %}" 
-                    onclick="location.href='?report_type=monthly&month={{ selected_month }}&year={{ selected_year }}{% if selected_department %}&department_id={{ selected_department }}{% endif %}'">
-                <i class="fas fa-calendar-alt me-2"></i>Monthly Summary
-            </button>
-            <button class="tab-button {% if report_type == 'weekly' %}active{% endif %}" 
-                    onclick="location.href='?report_type=weekly{% if selected_department %}&department_id={{ selected_department }}{% endif %}'">
-                <i class="fas fa-calendar-week me-2"></i>Weekly Details
-            </button>
-            <button class="tab-button {% if report_type == 'coverage' %}active{% endif %}" 
-                    onclick="location.href='?report_type=coverage&month={{ selected_month }}&year={{ selected_year }}{% if selected_department %}&department_id={{ selected_department }}{% endif %}'">
-                <i class="fas fa-users me-2"></i>Coverage Report
-            </button>
-        </div>
-        
-        <!-- Filter Form -->
-        <div class="filter-form">
-            <form method="GET" action="{{ url_for('schedule_reports') }}" class="row g-3">
-                <input type="hidden" name="report_type" value="{{ report_type }}">
-                
-                {% if report_type in ['monthly', 'coverage'] %}
-                <div class="col-md-4">
-                    <label class="form-label">Month</label>
-                    <select class="form-select" name="month">
-                        {% for month_num, month_name in months %}
-                        <option value="{{ month_num }}" {% if selected_month == month_num %}selected{% endif %}>
-                            {{ month_name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <div class="col-md-4">
-                    <label class="form-label">Year</label>
-                    <select class="form-select" name="year">
-                        {% for year in years %}
-                        <option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>
-                            {{ year }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% endif %}
-                
-                <div class="col-md-4">
-                    <label class="form-label">Department</label>
-                    <select class="form-select" name="department_id">
-                        <option value="">All Departments</option>
-                        {% for dept in departments %}
-                        <option value="{{ dept[0] }}" {% if selected_department == dept[0]|string %}selected{% endif %}>
-                            {{ dept[1] }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <div class="col-12">
-                    <div class="d-flex justify-content-end">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-filter me-2"></i>Generate Report
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary ms-2" onclick="window.print()">
-                            <i class="fas fa-print me-2"></i>Print
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
-        
         <!-- Summary Statistics -->
         <div class="row mb-4">
             <div class="col-md-3">
                 <div class="stat-card">
-                    <div class="stat-number">{{ total_shifts }}</div>
-                    <small>Total Shifts</small>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stat-card" style="background: linear-gradient(135deg, var(--success), #0ca678);">
-                    <div class="stat-number">{{ "%.1f"|format(total_hours) }}</div>
-                    <small>Total Hours</small>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stat-card" style="background: linear-gradient(135deg, var(--secondary), #7c3aed);">
-                    <div class="stat-number">{{ report_data|length }}</div>
-                    <small>{% if report_type == 'monthly' %}Staff{% elif report_type == 'coverage' %}Days{% else %}Records{% endif %}</small>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stat-card" style="background: linear-gradient(135deg, #f59e0b, #f08c00);">
-                    <div class="stat-number">
-                        {% if total_shifts > 0 %}
-                            {{ "%.1f"|format(total_hours / total_shifts) }}
-                        {% else %}
-                            0
-                        {% endif %}
+                    <div class="stat-icon">
+                        <i class="bi bi-calendar-check"></i>
                     </div>
-                    <small>Avg Hours/Shift</small>
+                    <div class="stat-value">{{ total_shifts }}</div>
+                    <div class="stat-label">Total Shifts</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="bi bi-clock"></i>
+                    </div>
+                    <div class="stat-value">{{ "%.1f"|format(total_hours) }}</div>
+                    <div class="stat-label">Total Hours</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="bi bi-people"></i>
+                    </div>
+                    <div class="stat-value">{{ unique_staff }}</div>
+                    <div class="stat-label">Unique Staff</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="bi bi-calculator"></i>
+                    </div>
+                    <div class="stat-value">{{ "%.1f"|format(avg_hours_per_shift) }}</div>
+                    <div class="stat-label">Avg Hours/Shift</div>
                 </div>
             </div>
         </div>
-        
-        <!-- Charts -->
-        {% if report_data %}
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="chart-container">
-                    <h5><i class="fas fa-chart-pie me-2"></i>Shift Distribution</h5>
-                    <canvas id="shiftChart" height="200"></canvas>
-                </div>
+
+        <!-- Report Data Table -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    {% if report_type == 'monthly' %}
+                        Monthly Summary - {{ months[selected_month-1][1] }} {{ selected_year }}
+                    {% elif report_type == 'weekly' %}
+                        Weekly Schedule
+                    {% else %}
+                        Coverage Analysis - {{ months[selected_month-1][1] }} {{ selected_year }}
+                    {% endif %}
+                </h5>
+                <span class="badge bg-primary">{{ report_data|length }} Records</span>
             </div>
-            <div class="col-md-6">
-                <div class="chart-container">
-                    <h5><i class="fas fa-chart-line me-2"></i>Weekly Coverage</h5>
-                    <canvas id="coverageChart" height="200"></canvas>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        
-        <!-- Report Data -->
-        <div class="report-card">
-            <h4 class="mb-4">
-                <i class="fas fa-table me-2"></i>
-                {% if report_type == 'monthly' %}
-                    Monthly Schedule Report - {{ months[selected_month-1][1] }} {{ selected_year }}
-                {% elif report_type == 'weekly' %}
-                    Weekly Schedule Details
-                {% elif report_type == 'coverage' %}
-                    Daily Coverage Report - {{ months[selected_month-1][1] }} {{ selected_year }}
-                {% endif %}
-                {% if selected_department %}
-                    <span class="badge bg-primary ms-2">
-                        {% for dept in departments %}
-                            {% if dept[0]|string == selected_department %}{{ dept[1] }}{% endif %}
-                        {% endfor %}
-                    </span>
-                {% endif %}
-            </h4>
-            
-            {% if report_data %}
-                <div class="table-responsive">
-                    <table class="table table-hover report-table">
-                        <thead>
-                            {% if report_type == 'monthly' %}
-                            <tr>
-                                <th>Department</th>
-                                <th>Staff Name</th>
-                                <th>Total Shifts</th>
-                                <th>Days Scheduled</th>
-                                <th>Total Hours</th>
-                                <th>Avg Hours/Day</th>
-                            </tr>
-                            {% elif report_type == 'weekly' %}
-                            <tr>
-                                <th>Date</th>
-                                <th>Department</th>
-                                <th>Staff Name</th>
-                                <th>Shift Type</th>
-                                <th>Start Time</th>
-                                <th>End Time</th>
-                                <th>Hours</th>
-                            </tr>
-                            {% elif report_type == 'coverage' %}
-                            <tr>
-                                <th>Date</th>
-                                <th>Staff Count</th>
-                                <th>Staff Names</th>
-                            </tr>
-                            {% endif %}
-                        </thead>
-                        <tbody>
-                            {% for row in report_data %}
-                            <tr>
-                                {% if report_type == 'monthly' %}
-                                <td>{{ row[0] }}</td>
-                                <td>{{ row[1] }}</td>
-                                <td>{{ row[2] }}</td>
-                                <td>{{ row[4] }}</td>
-                                <td>{{ "%.1f"|format(row[3]) if row[3] else 0 }}</td>
-                                <td>
-                                    {% if row[4] > 0 %}
-                                        {{ "%.1f"|format(row[3]/row[4]) if row[3] else 0 }}
-                                    {% else %}
-                                        0
-                                    {% endif %}
-                                </td>
-                                {% elif report_type == 'weekly' %}
-                                <td>{{ row[0].strftime('%Y-%m-%d') }}</td>
-                                <td>{{ row[1] }}</td>
-                                <td>{{ row[2] }}</td>
-                                <td>{{ row[3] }}</td>
-                                <td>{{ row[4].strftime('%I:%M %p') }}</td>
-                                <td>{{ row[5].strftime('%I:%M %p') }}</td>
-                                <td>{{ "%.1f"|format(row[6]) if row[6] else 0 }}</td>
-                                {% elif report_type == 'coverage' %}
-                                <td>{{ row[0].strftime('%Y-%m-%d') }}</td>
-                                <td>{{ row[1] }}</td>
-                                <td>{{ row[2][:100] }}{% if row[2]|length > 100 %}...{% endif %}</td>
-                                {% endif %}
-                            </tr>
+            <div class="card-body">
+                {% if report_data %}
+                    {% if report_type == 'monthly' %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Staff Name</th>
+                                        <th>Department</th>
+                                        <th>Position</th>
+                                        <th>Total Shifts</th>
+                                        <th>Total Hours</th>
+                                        <th>Days Scheduled</th>
+                                        <th>Avg Hours/Day</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in report_data %}
+                                    <tr>
+                                        <td><strong>{{ item.staff_name }}</strong></td>
+                                        <td>{{ item.department }}</td>
+                                        <td>{{ item.position }}</td>
+                                        <td>{{ item.total_shifts }}</td>
+                                        <td>{{ "%.1f"|format(item.total_hours) }}</td>
+                                        <td>{{ item.days_scheduled }}</td>
+                                        <td>{{ "%.1f"|format(item.total_hours / item.days_scheduled if item.days_scheduled > 0 else 0) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    
+                    {% elif report_type == 'weekly' %}
+                        <div class="accordion" id="weeklyAccordion">
+                            {% for day in report_data %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#day{{ loop.index }}">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <span><strong>{{ day.date.strftime('%A, %B %d, %Y') }}</strong></span>
+                                            <span class="badge bg-info">{{ day.staff_count }} Staff | {{ "%.1f"|format(day.total_hours) }} Hours</span>
+                                        </div>
+                                    </button>
+                                </h2>
+                                <div id="day{{ loop.index }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}" data-bs-parent="#weeklyAccordion">
+                                    <div class="accordion-body">
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>Staff</th>
+                                                    <th>Department</th>
+                                                    <th>Shift Type</th>
+                                                    <th>Time</th>
+                                                    <th>Hours</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for shift in day.shifts %}
+                                                <tr>
+                                                    <td>{{ shift.staff_name }}</td>
+                                                    <td>{{ shift.department }}</td>
+                                                    <td>{{ shift.shift_type or 'Regular' }}</td>
+                                                    <td>{{ shift.start_time.strftime('%H:%M') if shift.start_time else 'N/A' }} - {{ shift.end_time.strftime('%H:%M') if shift.end_time else 'N/A' }}</td>
+                                                    <td>{{ "%.1f"|format(shift.hours) }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
                             {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                
-                <!-- Export Options -->
-                <div class="d-flex justify-content-end mt-3">
-                    <button class="btn btn-outline-primary me-2" onclick="exportToCSV()">
-                        <i class="fas fa-file-csv me-2"></i>Export CSV
-                    </button>
-                    <button class="btn btn-outline-success" onclick="exportToExcel()">
-                        <i class="fas fa-file-excel me-2"></i>Export Excel
-                    </button>
-                </div>
-            {% else %}
-                <div class="empty-state">
-                    <i class="fas fa-chart-bar"></i>
-                    <h4>No Data Available</h4>
-                    <p class="text-muted">No scheduling data matches your filter criteria.</p>
-                    <a href="{{ url_for('create_schedule') }}" class="btn btn-primary">
-                        <i class="fas fa-plus me-2"></i>Create Schedules
-                    </a>
-                </div>
-            {% endif %}
+                        </div>
+                    
+                    {% elif report_type == 'coverage' %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Staff Count</th>
+                                        <th>Total Shifts</th>
+                                        <th>Total Hours</th>
+                                        <th>Departments</th>
+                                        <th>Staff Names</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in report_data %}
+                                    <tr>
+                                        <td><strong>{{ item.date.strftime('%Y-%m-%d') }}</strong></td>
+                                        <td>{{ item.staff_count }}</td>
+                                        <td>{{ item.total_shifts }}</td>
+                                        <td>{{ "%.1f"|format(item.daily_hours) }}</td>
+                                        <td>{{ item.departments_covered }}</td>
+                                        <td>
+                                            <span title="{{ item.staff_names }}">
+                                                {{ item.staff_names[:50] }}{% if item.staff_names and item.staff_names|length > 50 %}...{% endif %}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-inbox text-muted" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3">No Data Available</h5>
+                        <p class="text-muted">No schedule records found for the selected period.</p>
+                    </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 
-    <!-- Bootstrap JS Bundle with Popper -->
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p class="mb-0">&copy; {{ current_year }} Memorial Hospital Ovuru, Nsukka, Enugu State. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <script>
-        // Initialize charts if data exists
-        {% if report_data and report_type == 'monthly' %}
-        // Shift Distribution Chart
-        const shiftCtx = document.getElementById('shiftChart').getContext('2d');
-        const shiftChart = new Chart(shiftCtx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Morning', 'Afternoon', 'Night', 'Other'],
-                datasets: [{
-                    data: [45, 30, 20, 5],
-                    backgroundColor: [
-                        '#10b981',
-                        '#f59e0b',
-                        '#8b5cf6',
-                        '#64748b'
-                    ],
-                    borderWidth: 2,
-                    borderColor: '#ffffff'
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'bottom'
-                    }
-                }
-            }
-        });
-        
-        // Coverage Chart
-        const coverageCtx = document.getElementById('coverageChart').getContext('2d');
-        const coverageChart = new Chart(coverageCtx, {
-            type: 'line',
-            data: {
-                labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-                datasets: [{
-                    label: 'Staff Coverage',
-                    data: [85, 90, 88, 92],
-                    borderColor: '#4361ee',
-                    backgroundColor: 'rgba(67, 97, 238, 0.1)',
-                    borderWidth: 3,
-                    fill: true,
-                    tension: 0.3
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        min: 80,
-                        max: 100,
-                        ticks: {
-                            callback: function(value) {
-                                return value + '%';
-                            }
-                        }
-                    }
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return 'Coverage: ' + context.parsed.y + '%';
-                            }
-                        }
-                    }
-                }
-            }
-        });
-        {% endif %}
-        
-        // Export functions
-        function exportToCSV() {
-            alert('CSV export feature will be available soon!');
-            // In a real implementation, this would make an AJAX call to an export endpoint
-        }
-        
-        function exportToExcel() {
-            alert('Excel export feature will be available soon!');
-            // In a real implementation, this would make an AJAX call to an export endpoint
-        }
-        
-        // Auto-update report when filters change
-        document.querySelectorAll('select[name="month"], select[name="year"], select[name="department_id"]').forEach(select => {
-            select.addEventListener('change', function() {
-                this.form.submit();
-            });
-        });
-        
-        // Print optimization
-        function beforePrint() {
-            document.querySelectorAll('.chart-container').forEach(container => {
-                container.style.height = '300px';
-            });
-        }
-        
-        function afterPrint() {
-            document.querySelectorAll('.chart-container').forEach(container => {
-                container.style.height = 'auto';
-            });
-        }
-        
-        if (window.matchMedia) {
-            const mediaQueryList = window.matchMedia('print');
-            mediaQueryList.addListener((mql) => {
-                if (mql.matches) {
-                    beforePrint();
-                } else {
-                    afterPrint();
-                }
-            });
-        }
-        
-        window.onbeforeprint = beforePrint;
-        window.onafterprint = afterPrint;
-    </script>
 </body>
 </html>

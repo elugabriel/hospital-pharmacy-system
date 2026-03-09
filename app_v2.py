@@ -201,6 +201,193 @@ def create_default_users():
     conn.commit()
     cursor.close()
     conn.close()
+    
+def create_hr_tables():
+    """Create HR-related tables in PostgreSQL."""
+    conn = get_db_connection()
+    if not conn:
+        app.logger.error("Cannot connect to database for HR table creation")
+        return
+
+    cursor = conn.cursor()
+    
+    # Enable UUID extension if needed
+    try:
+        cursor.execute("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";")
+    except Exception as e:
+        app.logger.warning(f"Could not enable uuid-ossp extension: {e}")
+    
+    # HR Users Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS hr_users (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(50) UNIQUE NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            full_name VARCHAR(100) NOT NULL,
+            email VARCHAR(100),
+            role VARCHAR(50) DEFAULT 'HR Staff',
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # Departments Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS departments (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            code VARCHAR(20) UNIQUE NOT NULL,
+            description TEXT,
+            head_of_dept VARCHAR(100),
+            status VARCHAR(20) DEFAULT 'Active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # Staff Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS staff (
+            id SERIAL PRIMARY KEY,
+            staff_id VARCHAR(50) UNIQUE NOT NULL,
+            first_name VARCHAR(100) NOT NULL,
+            last_name VARCHAR(100) NOT NULL,
+            department_id INTEGER REFERENCES departments(id),
+            position VARCHAR(100) NOT NULL,
+            employment_type VARCHAR(50),
+            email VARCHAR(100),
+            phone VARCHAR(20),
+            hire_date DATE NOT NULL,
+            salary DECIMAL(12, 2),
+            status VARCHAR(20) DEFAULT 'Active',
+            emergency_contact VARCHAR(100),
+            address TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # Attendance Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS attendance (
+            id SERIAL PRIMARY KEY,
+            staff_id INTEGER REFERENCES staff(id),
+            date DATE NOT NULL,
+            check_in TIME,
+            check_out TIME,
+            status VARCHAR(20),
+            remarks TEXT,
+            recorded_by INTEGER REFERENCES hr_users(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # Leaves Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS leaves (
+            id SERIAL PRIMARY KEY,
+            staff_id INTEGER REFERENCES staff(id),
+            leave_type VARCHAR(50) NOT NULL,
+            start_date DATE NOT NULL,
+            end_date DATE NOT NULL,
+            days_requested INTEGER NOT NULL,
+            reason TEXT,
+            status VARCHAR(20) DEFAULT 'Pending',
+            approved_by INTEGER REFERENCES hr_users(id),
+            approved_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # Schedules Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS schedules (
+            id SERIAL PRIMARY KEY,
+            staff_id INTEGER REFERENCES staff(id),
+            schedule_date DATE NOT NULL,
+            shift_type VARCHAR(50),
+            start_time TIME NOT NULL,
+            end_time TIME NOT NULL,
+            location VARCHAR(100),
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # Payroll Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS payroll (
+            id SERIAL PRIMARY KEY,
+            staff_id INTEGER REFERENCES staff(id),
+            pay_period VARCHAR(50),
+            basic_salary DECIMAL(12, 2),
+            allowances DECIMAL(12, 2),
+            deductions DECIMAL(12, 2),
+            net_salary DECIMAL(12, 2),
+            status VARCHAR(20) DEFAULT 'Pending',
+            payment_date DATE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # Documents Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS documents (
+            id SERIAL PRIMARY KEY,
+            staff_id INTEGER REFERENCES staff(id),
+            document_type VARCHAR(50),
+            document_name VARCHAR(255),
+            file_path VARCHAR(500),
+            uploaded_by INTEGER REFERENCES hr_users(id),
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
+    # ADD THIS NEW TABLE FOR SHIFT SWAP REQUESTS
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS shift_swap_requests (
+            id SERIAL PRIMARY KEY,
+            schedule_id INTEGER NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+            from_staff_id INTEGER NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+            to_staff_id INTEGER NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+            reason TEXT,
+            status VARCHAR(20) DEFAULT 'Pending',
+            requested_by INTEGER REFERENCES hr_users(id),
+            requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            approved_by INTEGER REFERENCES hr_users(id),
+            approved_at TIMESTAMP,
+            reviewed_by INTEGER REFERENCES hr_users(id),
+            reviewed_at TIMESTAMP,
+            rejection_reason TEXT,
+            notes TEXT
+        );
+    """)
+    
+    # Create indexes for better performance
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_staff_department ON staff(department_id);",
+        "CREATE INDEX IF NOT EXISTS idx_attendance_staff_date ON attendance(staff_id, date);",
+        "CREATE INDEX IF NOT EXISTS idx_leaves_staff_status ON leaves(staff_id, status);",
+        "CREATE INDEX IF NOT EXISTS idx_schedules_staff_date ON schedules(staff_id, schedule_date);",
+        "CREATE INDEX IF NOT EXISTS idx_payroll_staff_period ON payroll(staff_id, pay_period);",
+        "CREATE INDEX IF NOT EXISTS idx_staff_status ON staff(status);",
+        "CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);",
+        "CREATE INDEX IF NOT EXISTS idx_leaves_status ON leaves(status);",
+        "CREATE INDEX IF NOT EXISTS idx_shift_swap_status ON shift_swap_requests(status);",  # ADD THIS INDEX
+        "CREATE INDEX IF NOT EXISTS idx_shift_swap_schedule ON shift_swap_requests(schedule_id);"  # ADD THIS INDEX
+    ]
+    
+    for index_query in indexes:
+        try:
+            cursor.execute(index_query)
+        except Exception as e:
+            app.logger.warning(f"Could not create index: {e}")
+    
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
+    # Insert default data
+    create_default_hr_data()
 
 # -------------------- HELPER FUNCTIONS --------------------
 def format_currency(amount):
@@ -1965,54 +2152,42 @@ def hr_login():
 #                          module_name="Scheduling",
 #                          description="Create and manage work schedules and shifts")
 
-@app.route("/hr/leave-management")
-def leave_management():
-    if "hr_user_id" not in session:
-        return redirect(url_for("hr_login"))
-    return render_template("module_placeholder.html", 
-                         module_name="Leave Management",
-                         description="Approve and track staff leave requests")
+# 
 
-@app.route("/hr/attendance-record")
-def attendance_record():
-    if "hr_user_id" not in session:
-        return redirect(url_for("hr_login"))
-    return render_template("module_placeholder.html", 
-                         module_name="Attendance Record",
-                         description="Track staff attendance and punctuality")
 
-@app.route("/hr/departments")
-def departments():
-    if "hr_user_id" not in session:
-        return redirect(url_for("hr_login"))
+
+# @app.route("/hr/departments")
+# def departments():
+#     if "hr_user_id" not in session:
+#         return redirect(url_for("hr_login"))
     
-    conn = get_db_connection()
-    cur = conn.cursor()
+#     conn = get_db_connection()
+#     cur = conn.cursor()
     
-    try:
-        # Get all departments with staff count
-        cur.execute("""
-            SELECT d.*, 
-                   COUNT(s.id) as staff_count
-            FROM departments d
-            LEFT JOIN staff s ON d.id = s.department_id AND s.status = 'Active'
-            GROUP BY d.id
-            ORDER BY d.name
-        """)
-        dept_list = cur.fetchall()
+#     try:
+#         # Get all departments with staff count
+#         cur.execute("""
+#             SELECT d.*, 
+#                    COUNT(s.id) as staff_count
+#             FROM departments d
+#             LEFT JOIN staff s ON d.id = s.department_id AND s.status = 'Active'
+#             GROUP BY d.id
+#             ORDER BY d.name
+#         """)
+#         dept_list = cur.fetchall()
         
-    except Exception as e:
-        app.logger.error(f"Error fetching departments: {e}")
-        dept_list = []
+#     except Exception as e:
+#         app.logger.error(f"Error fetching departments: {e}")
+#         dept_list = []
     
-    finally:
-        cur.close()
-        conn.close()
+#     finally:
+#         cur.close()
+#         conn.close()
     
-    return render_template("hr_departments.html", 
-                         module_name="Departments",
-                         description="Manage hospital departments and reporting structure",
-                         departments=dept_list)
+#     return render_template("hr_departments.html", 
+#                          module_name="Departments",
+#                          description="Manage hospital departments and reporting structure",
+#                          departments=dept_list)
 
 @app.route("/hr/reports")
 def hr_reports():
@@ -2030,19 +2205,9 @@ def hr_reports():
 #     flash("Feature coming soon: Add New Staff", "info")
 #     return redirect(url_for("hr_dashboard"))
 
-@app.route("/hr/approve-leave")
-def approve_leave():
-    if "hr_user_id" not in session:
-        return redirect(url_for("hr_login"))
-    flash("Feature coming soon: Approve Leave Requests", "info")
-    return redirect(url_for("hr_dashboard"))
 
-@app.route("/hr/mark-attendance")
-def mark_attendance():
-    if "hr_user_id" not in session:
-        return redirect(url_for("hr_login"))
-    flash("Feature coming soon: Mark Attendance", "info")
-    return redirect(url_for("hr_dashboard"))
+
+
 
 @app.route("/hr/generate-payroll")
 def generate_payroll():
@@ -2832,7 +2997,7 @@ def shift_swap():
                     flash("Schedule not found", "danger")
                     return redirect(url_for("shift_swap"))
                 
-                # Check if staff is available on that date
+                # Check if target staff is available on that date
                 cur.execute("""
                     SELECT id FROM schedules 
                     WHERE staff_id = %s AND schedule_date = %s
@@ -2842,21 +3007,25 @@ def shift_swap():
                     flash("Selected staff already has a schedule on this date", "warning")
                     return redirect(url_for("shift_swap"))
                 
-                # Create shift swap request (you'll need to create this table)
+                # Create shift swap request
                 cur.execute("""
                     INSERT INTO shift_swap_requests (
                         schedule_id, from_staff_id, to_staff_id, 
                         reason, status, requested_by, requested_at
                     ) VALUES (%s, %s, %s, %s, 'Pending', %s, NOW())
+                    RETURNING id
                 """, (schedule_id, from_staff_id, to_staff_id, reason, session["hr_user_id"]))
                 
+                swap_id = cur.fetchone()[0]
                 conn.commit()
-                flash("Shift swap request submitted successfully!", "success")
+                flash(f"Shift swap request #{swap_id} submitted successfully!", "success")
                 
             except Exception as e:
                 conn.rollback()
                 app.logger.error(f"Error creating shift swap request: {e}")
-                flash(f"Error: {str(e)}", "danger")
+                flash(f"Error creating swap request: {str(e)}", "danger")
+            
+            return redirect(url_for("shift_swap"))
         
         elif action == "approve":
             # Approve shift swap
@@ -2878,9 +3047,10 @@ def shift_swap():
                 # Update schedule with new staff
                 cur.execute("""
                     UPDATE schedules 
-                    SET staff_id = %s 
+                    SET staff_id = %s, 
+                        notes = COALESCE(notes, '') || ' [Shift swapped from staff ID ' || %s || ']'
                     WHERE id = %s
-                """, (swap_request[2], swap_request[0]))
+                """, (swap_request[2], swap_request[1], swap_request[0]))
                 
                 # Update swap request status
                 cur.execute("""
@@ -2892,12 +3062,14 @@ def shift_swap():
                 """, (session["hr_user_id"], swap_id))
                 
                 conn.commit()
-                flash("Shift swap approved successfully!", "success")
+                flash(f"Shift swap request #{swap_id} approved successfully!", "success")
                 
             except Exception as e:
                 conn.rollback()
                 app.logger.error(f"Error approving shift swap: {e}")
-                flash(f"Error: {str(e)}", "danger")
+                flash(f"Error approving swap: {str(e)}", "danger")
+            
+            return redirect(url_for("shift_swap"))
         
         elif action == "reject":
             # Reject shift swap
@@ -2915,67 +3087,177 @@ def shift_swap():
                 """, (rejection_reason, session["hr_user_id"], swap_id))
                 
                 conn.commit()
-                flash("Shift swap request rejected", "info")
+                flash(f"Shift swap request #{swap_id} rejected", "info")
                 
             except Exception as e:
                 conn.rollback()
                 app.logger.error(f"Error rejecting shift swap: {e}")
-                flash(f"Error: {str(e)}", "danger")
+                flash(f"Error rejecting swap: {str(e)}", "danger")
+            
+            return redirect(url_for("shift_swap"))
     
     # GET request - show shift swap page
     try:
-        # Get pending shift swap requests
+        # Get all shift swap requests with details
         cur.execute("""
-            SELECT ssr.*, 
-                   s1.first_name as from_first_name, s1.last_name as from_last_name,
-                   s2.first_name as to_first_name, s2.last_name as to_last_name,
-                   sch.schedule_date, sch.start_time, sch.end_time
+            SELECT 
+                ssr.id,
+                ssr.schedule_id,
+                ssr.from_staff_id,
+                ssr.to_staff_id,
+                ssr.reason,
+                ssr.status,
+                ssr.requested_at,
+                ssr.approved_at,
+                ssr.rejection_reason,
+                -- From staff details
+                s1.first_name as from_first_name,
+                s1.last_name as from_last_name,
+                s1.position as from_position,
+                -- To staff details
+                s2.first_name as to_first_name,
+                s2.last_name as to_last_name,
+                s2.position as to_position,
+                -- Schedule details
+                sch.schedule_date,
+                sch.start_time,
+                sch.end_time,
+                sch.shift_type,
+                -- Requester details
+                hu.username as requested_by_username
             FROM shift_swap_requests ssr
             JOIN schedules sch ON ssr.schedule_id = sch.id
             JOIN staff s1 ON ssr.from_staff_id = s1.id
             JOIN staff s2 ON ssr.to_staff_id = s2.id
-            WHERE ssr.status = 'Pending'
-            ORDER BY ssr.requested_at DESC
+            LEFT JOIN hr_users hu ON ssr.requested_by = hu.id
+            ORDER BY 
+                CASE 
+                    WHEN ssr.status = 'Pending' THEN 1
+                    WHEN ssr.status = 'Approved' THEN 2
+                    ELSE 3
+                END,
+                ssr.requested_at DESC
         """)
-        pending_swaps = cur.fetchall()
         
-        # Get upcoming schedules for current staff
+        all_swaps = cur.fetchall()
+        
+        # Separate pending and history swaps
+        pending_swaps = []
+        swap_history = []
+        
+        for swap in all_swaps:
+            swap_dict = {
+                'id': swap[0],
+                'schedule_id': swap[1],
+                'from_staff_id': swap[2],
+                'to_staff_id': swap[3],
+                'reason': swap[4],
+                'status': swap[5],
+                'requested_at': swap[6],
+                'approved_at': swap[7],
+                'rejection_reason': swap[8],
+                'from_staff_name': f"{swap[9]} {swap[10]}",
+                'from_staff_position': swap[11],
+                'to_staff_name': f"{swap[12]} {swap[13]}",
+                'to_staff_position': swap[14],
+                'schedule_date': swap[15],
+                'start_time': swap[16],
+                'end_time': swap[17],
+                'shift_type': swap[18],
+                'requested_by': swap[19]
+            }
+            
+            if swap_dict['status'] == 'Pending':
+                pending_swaps.append(swap_dict)
+            else:
+                swap_history.append(swap_dict)
+        
+        # Get upcoming schedules for swap requests
         cur.execute("""
-            SELECT sch.id, sch.schedule_date, sch.start_time, sch.end_time,
-                   st.first_name, st.last_name, st.position
+            SELECT 
+                sch.id,
+                sch.schedule_date,
+                sch.start_time,
+                sch.end_time,
+                sch.shift_type,
+                st.first_name,
+                st.last_name,
+                st.position,
+                d.name as department_name
             FROM schedules sch
             JOIN staff st ON sch.staff_id = st.id
+            LEFT JOIN departments d ON st.department_id = d.id
             WHERE sch.schedule_date >= CURRENT_DATE
             ORDER BY sch.schedule_date, sch.start_time
             LIMIT 50
         """)
-        upcoming_schedules = cur.fetchall()
         
-        # Get available staff for swaps
+        upcoming_schedules = cur.fetchall()
+        formatted_schedules = []
+        for sched in upcoming_schedules:
+            formatted_schedules.append({
+                'id': sched[0],
+                'date': sched[1],
+                'start_time': sched[2],
+                'end_time': sched[3],
+                'shift_type': sched[4],
+                'staff_name': f"{sched[5]} {sched[6]}",
+                'position': sched[7],
+                'department': sched[8]
+            })
+        
+        # Get all active staff for swap requests
         cur.execute("""
-            SELECT id, first_name, last_name, position 
+            SELECT id, first_name, last_name, position, 
+                   (SELECT name FROM departments WHERE id = staff.department_id) as department
             FROM staff 
             WHERE status = 'Active' 
             ORDER BY first_name, last_name
         """)
+        
         staff_list = cur.fetchall()
+        formatted_staff = []
+        for staff in staff_list:
+            formatted_staff.append({
+                'id': staff[0],
+                'name': f"{staff[1]} {staff[2]}",
+                'position': staff[3],
+                'department': staff[4]
+            })
+        
+        # Get statistics
+        cur.execute("SELECT COUNT(*) FROM shift_swap_requests WHERE status = 'Pending'")
+        pending_count = cur.fetchone()[0] or 0
+        
+        cur.execute("SELECT COUNT(*) FROM shift_swap_requests WHERE status = 'Approved' AND approved_at >= NOW() - INTERVAL '30 days'")
+        approved_30days = cur.fetchone()[0] or 0
         
     except Exception as e:
         app.logger.error(f"Error loading shift swap data: {e}")
         pending_swaps = []
-        upcoming_schedules = []
-        staff_list = []
+        swap_history = []
+        formatted_schedules = []
+        formatted_staff = []
+        pending_count = 0
+        approved_30days = 0
     
     finally:
         cur.close()
         conn.close()
     
-    return render_template("shift_swap.html",
-                         pending_swaps=pending_swaps,
-                         upcoming_schedules=upcoming_schedules,
-                         staff_list=staff_list,
-                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
-
+    return render_template(
+        "shift_swap.html",
+        pending_swaps=pending_swaps,
+        swap_history=swap_history,
+        upcoming_schedules=formatted_schedules,
+        staff_list=formatted_staff,
+        pending_count=pending_count,
+        approved_30days=approved_30days,
+        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        current_year=date.today().year
+    )
+    
+    
 @app.route("/hr/scheduling/reports")
 def schedule_reports():
     if "hr_user_id" not in session:
@@ -2990,6 +3272,11 @@ def schedule_reports():
     conn = get_db_connection()
     cur = conn.cursor()
     
+    report_data = []
+    total_shifts = 0
+    total_hours = 0
+    unique_staff = 0
+    
     try:
         # Build report query based on report type
         if report_type == "monthly":
@@ -3001,11 +3288,13 @@ def schedule_reports():
             
             query = """
                 SELECT 
-                    d.name as department,
+                    COALESCE(d.name, 'No Department') as department,
                     st.first_name || ' ' || st.last_name as staff_name,
                     COUNT(*) as total_shifts,
-                    SUM(EXTRACT(EPOCH FROM (end_time - start_time))/3600) as total_hours,
-                    COUNT(DISTINCT sch.schedule_date) as days_scheduled
+                    COALESCE(SUM(EXTRACT(EPOCH FROM (end_time - start_time))/3600), 0) as total_hours,
+                    COUNT(DISTINCT sch.schedule_date) as days_scheduled,
+                    st.position,
+                    st.id as staff_id
                 FROM schedules sch
                 JOIN staff st ON sch.staff_id = st.id
                 LEFT JOIN departments d ON st.department_id = d.id
@@ -3018,9 +3307,28 @@ def schedule_reports():
                 params.append(department_id)
             
             query += """
-                GROUP BY d.name, st.first_name, st.last_name
+                GROUP BY d.name, st.first_name, st.last_name, st.position, st.id
                 ORDER BY d.name, staff_name
             """
+            
+            cur.execute(query, params)
+            rows = cur.fetchall()
+            
+            # Format the report data
+            for row in rows:
+                report_data.append({
+                    'department': row[0],
+                    'staff_name': row[1],
+                    'total_shifts': row[2],
+                    'total_hours': float(row[3]) if row[3] else 0,
+                    'days_scheduled': row[4],
+                    'position': row[5],
+                    'staff_id': row[6]
+                })
+                total_shifts += row[2]
+                total_hours += float(row[3]) if row[3] else 0
+            
+            unique_staff = len(report_data)
             
         elif report_type == "weekly":
             # Get current week
@@ -3028,15 +3336,25 @@ def schedule_reports():
             start_date = today - timedelta(days=today.weekday())
             end_date = start_date + timedelta(days=6)
             
+            # Allow custom week if specified
+            if request.args.get("week_start"):
+                try:
+                    start_date = datetime.strptime(request.args.get("week_start"), "%Y-%m-%d").date()
+                    end_date = start_date + timedelta(days=6)
+                except:
+                    pass
+            
             query = """
                 SELECT 
                     sch.schedule_date,
-                    d.name as department,
+                    COALESCE(d.name, 'No Department') as department,
                     st.first_name || ' ' || st.last_name as staff_name,
                     sch.shift_type,
                     sch.start_time,
                     sch.end_time,
-                    EXTRACT(EPOCH FROM (sch.end_time - sch.start_time))/3600 as hours
+                    EXTRACT(EPOCH FROM (sch.end_time - sch.start_time))/3600 as hours,
+                    st.position,
+                    sch.id as schedule_id
                 FROM schedules sch
                 JOIN staff st ON sch.staff_id = st.id
                 LEFT JOIN departments d ON st.department_id = d.id
@@ -3048,7 +3366,42 @@ def schedule_reports():
                 query += " AND st.department_id = %s"
                 params.append(department_id)
             
-            query += " ORDER BY sch.schedule_date, sch.start_time"
+            query += " ORDER BY sch.schedule_date, d.name, sch.start_time"
+            
+            cur.execute(query, params)
+            rows = cur.fetchall()
+            
+            # Group by date for the report
+            daily_data = {}
+            for row in rows:
+                date_str = row[0].strftime("%Y-%m-%d")
+                if date_str not in daily_data:
+                    daily_data[date_str] = {
+                        'date': row[0],
+                        'shifts': [],
+                        'total_hours': 0,
+                        'staff_count': 0
+                    }
+                
+                hours = float(row[6]) if row[6] else 0
+                daily_data[date_str]['shifts'].append({
+                    'department': row[1],
+                    'staff_name': row[2],
+                    'shift_type': row[3],
+                    'start_time': row[4],
+                    'end_time': row[5],
+                    'hours': hours,
+                    'position': row[7],
+                    'schedule_id': row[8]
+                })
+                daily_data[date_str]['total_hours'] += hours
+                daily_data[date_str]['staff_count'] += 1
+                
+                total_hours += hours
+                total_shifts += 1
+            
+            report_data = list(daily_data.values())
+            unique_staff = len(set([s['staff_name'] for day in report_data for s in day['shifts']]))
             
         elif report_type == "coverage":
             start_date = date(int(year), int(month), 1)
@@ -3061,9 +3414,13 @@ def schedule_reports():
                 SELECT 
                     sch.schedule_date,
                     COUNT(DISTINCT sch.staff_id) as staff_count,
-                    STRING_AGG(st.first_name || ' ' || st.last_name, ', ') as staff_names
+                    COUNT(*) as total_shifts,
+                    STRING_AGG(DISTINCT st.first_name || ' ' || st.last_name, ', ') as staff_names,
+                    SUM(EXTRACT(EPOCH FROM (sch.end_time - sch.start_time))/3600) as daily_hours,
+                    COUNT(DISTINCT d.id) as departments_covered
                 FROM schedules sch
                 JOIN staff st ON sch.staff_id = st.id
+                LEFT JOIN departments d ON st.department_id = d.id
                 WHERE sch.schedule_date BETWEEN %s AND %s
             """
             params = [start_date, end_date]
@@ -3076,39 +3433,70 @@ def schedule_reports():
                 GROUP BY sch.schedule_date
                 ORDER BY sch.schedule_date
             """
+            
+            cur.execute(query, params)
+            rows = cur.fetchall()
+            
+            for row in rows:
+                report_data.append({
+                    'date': row[0],
+                    'staff_count': row[1],
+                    'total_shifts': row[2],
+                    'staff_names': row[3][:100] + '...' if row[3] and len(row[3]) > 100 else row[3],
+                    'daily_hours': float(row[4]) if row[4] else 0,
+                    'departments_covered': row[5]
+                })
+                total_shifts += row[2]
+                total_hours += float(row[4]) if row[4] else 0
+            
+            unique_staff = len(set([name for row in report_data for name in (row['staff_names'] or '').split(', ') if name]))
         
-        cur.execute(query, params)
-        report_data = cur.fetchall()
-        
-        # Get departments for filter
+        # Get departments for filter dropdown
         cur.execute("SELECT id, name FROM departments WHERE status = 'Active' ORDER BY name")
         departments = cur.fetchall()
         
         # Get months and years for filter
         months = [(i, month_name[i]) for i in range(1, 13)]
-        years = range(date.today().year - 5, date.today().year + 1)
+        years = range(date.today().year - 2, date.today().year + 2)
+        
+        # Calculate summary statistics
+        avg_hours_per_shift = total_hours / total_shifts if total_shifts > 0 else 0
+        avg_staff_per_day = total_shifts / len(report_data) if report_data and report_type == "coverage" else 0
         
     except Exception as e:
         app.logger.error(f"Error generating schedule report: {e}")
         report_data = []
         departments = []
         months = [(i, month_name[i]) for i in range(1, 13)]
-        years = range(date.today().year - 5, date.today().year + 1)
+        years = range(date.today().year - 2, date.today().year + 2)
+        total_shifts = 0
+        total_hours = 0
+        unique_staff = 0
+        avg_hours_per_shift = 0
+        avg_staff_per_day = 0
     
     finally:
         cur.close()
         conn.close()
     
-    return render_template("schedule_reports.html",
-                         report_data=report_data,
-                         report_type=report_type,
-                         departments=departments,
-                         months=months,
-                         years=years,
-                         selected_month=int(month),
-                         selected_year=int(year),
-                         selected_department=department_id,
-                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+    return render_template(
+        "schedule_reports.html",
+        report_data=report_data,
+        report_type=report_type,
+        departments=departments,
+        months=months,
+        years=years,
+        selected_month=int(month),
+        selected_year=int(year),
+        selected_department=department_id,
+        total_shifts=total_shifts,
+        total_hours=total_hours,
+        unique_staff=unique_staff,
+        avg_hours_per_shift=avg_hours_per_shift,
+        avg_staff_per_day=avg_staff_per_day,
+        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        current_year=date.today().year
+    )
 
 # Route to delete schedule
 @app.route("/hr/scheduling/delete/<int:schedule_id>", methods=["POST"])
@@ -3256,6 +3644,2251 @@ def check_availability():
     finally:
         cur.close()
         conn.close()
+        
+# ==================== ROUTES: LEAVE MANAGEMENT MODULE ====================
+
+@app.route("/hr/leave-management")
+def leave_management():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get all leave requests with staff details
+        cur.execute("""
+            SELECT 
+                l.id,
+                l.leave_type,
+                l.start_date,
+                l.end_date,
+                l.days_requested,
+                l.reason,
+                l.status,
+                l.created_at,
+                l.approved_at,
+                l.approved_by,
+                s.id as staff_id,
+                s.first_name,
+                s.last_name,
+                s.position,
+                d.name as department,
+                s.staff_id as employee_id,
+                hu.username as approved_by_name
+            FROM leaves l
+            JOIN staff s ON l.staff_id = s.id
+            LEFT JOIN departments d ON s.department_id = d.id
+            LEFT JOIN hr_users hu ON l.approved_by = hu.id
+            ORDER BY 
+                CASE 
+                    WHEN l.status = 'Pending' THEN 1
+                    WHEN l.status = 'Approved' THEN 2
+                    ELSE 3
+                END,
+                l.start_date DESC
+        """)
+        
+        leaves = cur.fetchall()
+        
+        # Separate pending and history leaves
+        pending_leaves = []
+        approved_leaves = []
+        rejected_leaves = []
+        
+        for leave in leaves:
+            leave_dict = {
+                'id': leave[0],
+                'leave_type': leave[1],
+                'start_date': leave[2],
+                'end_date': leave[3],
+                'days_requested': leave[4],
+                'reason': leave[5],
+                'status': leave[6],
+                'created_at': leave[7],
+                'approved_at': leave[8],
+                'approved_by': leave[9],
+                'staff_id': leave[10],
+                'first_name': leave[11],
+                'last_name': leave[12],
+                'staff_name': f"{leave[11]} {leave[12]}",
+                'position': leave[13],
+                'department': leave[14] or 'N/A',
+                'employee_id': leave[15],
+                'approved_by_name': leave[16]
+            }
+            
+            if leave_dict['status'] == 'Pending':
+                pending_leaves.append(leave_dict)
+            elif leave_dict['status'] == 'Approved':
+                approved_leaves.append(leave_dict)
+            elif leave_dict['status'] == 'Rejected':
+                rejected_leaves.append(leave_dict)
+        
+        # Get leave statistics
+        cur.execute("""
+            SELECT 
+                COUNT(*) as total_requests,
+                SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending_count,
+                SUM(CASE WHEN status = 'Approved' THEN 1 ELSE 0 END) as approved_count,
+                SUM(CASE WHEN status = 'Rejected' THEN 1 ELSE 0 END) as rejected_count
+            FROM leaves
+        """)
+        stats = cur.fetchone()
+        
+        # Get leave balance for active staff
+        cur.execute("""
+            SELECT 
+                s.id,
+                s.first_name,
+                s.last_name,
+                s.position,
+                d.name as department,
+                COALESCE(SUM(CASE 
+                    WHEN l.status = 'Approved' AND EXTRACT(YEAR FROM l.start_date) = EXTRACT(YEAR FROM CURRENT_DATE)
+                    THEN l.days_requested ELSE 0 END), 0) as days_taken,
+                20 - COALESCE(SUM(CASE 
+                    WHEN l.status = 'Approved' AND EXTRACT(YEAR FROM l.start_date) = EXTRACT(YEAR FROM CURRENT_DATE)
+                    THEN l.days_requested ELSE 0 END), 0) as days_remaining
+            FROM staff s
+            LEFT JOIN departments d ON s.department_id = d.id
+            LEFT JOIN leaves l ON s.id = l.staff_id AND l.status = 'Approved'
+            WHERE s.status = 'Active'
+            GROUP BY s.id, s.first_name, s.last_name, s.position, d.name
+            ORDER BY days_remaining ASC
+            LIMIT 10
+        """)
+        
+        leave_balances = cur.fetchall()
+        
+        # Get leave types distribution
+        cur.execute("""
+            SELECT 
+                leave_type,
+                COUNT(*) as count,
+                SUM(days_requested) as total_days
+            FROM leaves
+            WHERE status = 'Approved' 
+                AND EXTRACT(YEAR FROM start_date) = EXTRACT(YEAR FROM CURRENT_DATE)
+            GROUP BY leave_type
+            ORDER BY count DESC
+        """)
+        
+        leave_types = cur.fetchall()
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching leave data: {e}")
+        pending_leaves = []
+        approved_leaves = []
+        rejected_leaves = []
+        stats = (0, 0, 0, 0)
+        leave_balances = []
+        leave_types = []
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template(
+        "leave_management.html",
+        pending_leaves=pending_leaves,
+        approved_leaves=approved_leaves,
+        rejected_leaves=rejected_leaves,
+        total_requests=stats[0],
+        pending_count=stats[1],
+        approved_count=stats[2],
+        rejected_count=stats[3],
+        leave_balances=leave_balances,
+        leave_types=leave_types,
+        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        current_year=date.today().year
+    )
+
+
+@app.route("/hr/leave/request", methods=["GET", "POST"])
+def request_leave():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    if request.method == "POST":
+        staff_id = request.form.get("staff_id")
+        leave_type = request.form.get("leave_type")
+        start_date = request.form.get("start_date")
+        end_date = request.form.get("end_date")
+        reason = request.form.get("reason")
+        
+        # Calculate days requested
+        start = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end = datetime.strptime(end_date, "%Y-%m-%d").date()
+        days_requested = (end - start).days + 1
+        
+        if days_requested <= 0:
+            flash("End date must be after start date", "danger")
+            return redirect(url_for("request_leave"))
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        try:
+            # Check for overlapping leaves
+            cur.execute("""
+                SELECT id FROM leaves 
+                WHERE staff_id = %s 
+                AND status IN ('Pending', 'Approved')
+                AND NOT (end_date < %s OR start_date > %s)
+            """, (staff_id, start_date, end_date))
+            
+            if cur.fetchone():
+                flash("Staff already has a leave request for this period", "warning")
+                return redirect(url_for("request_leave"))
+            
+            # Insert leave request
+            cur.execute("""
+                INSERT INTO leaves (
+                    staff_id, leave_type, start_date, end_date, 
+                    days_requested, reason, status, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, 'Pending', NOW())
+                RETURNING id
+            """, (staff_id, leave_type, start_date, end_date, days_requested, reason))
+            
+            leave_id = cur.fetchone()[0]
+            conn.commit()
+            
+            flash(f"Leave request #{leave_id} submitted successfully!", "success")
+            return redirect(url_for("leave_management"))
+            
+        except Exception as e:
+            conn.rollback()
+            app.logger.error(f"Error creating leave request: {e}")
+            flash(f"Error creating leave request: {str(e)}", "danger")
+        
+        finally:
+            cur.close()
+            conn.close()
+    
+    # GET request - show form
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get active staff for dropdown
+        cur.execute("""
+            SELECT s.id, s.first_name, s.last_name, s.position, d.name as department
+            FROM staff s
+            LEFT JOIN departments d ON s.department_id = d.id
+            WHERE s.status = 'Active'
+            ORDER BY s.first_name, s.last_name
+        """)
+        staff_list = cur.fetchall()
+        
+        # Get leave types
+        leave_types = [
+            'Annual Leave',
+            'Sick Leave',
+            'Maternity Leave',
+            'Paternity Leave',
+            'Bereavement Leave',
+            'Study Leave',
+            'Unpaid Leave',
+            'Compensatory Off',
+            'Emergency Leave'
+        ]
+        
+    except Exception as e:
+        app.logger.error(f"Error loading leave form data: {e}")
+        staff_list = []
+        leave_types = []
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template(
+        "request_leave.html",
+        staff_list=staff_list,
+        leave_types=leave_types,
+        today=date.today().strftime("%Y-%m-%d"),
+        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State"
+    )
+
+
+@app.route("/hr/leave/approve/<int:leave_id>", methods=["POST"])
+def approve_leave(leave_id):
+    if "hr_user_id" not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            UPDATE leaves 
+            SET status = 'Approved', 
+                approved_by = %s, 
+                approved_at = NOW() 
+            WHERE id = %s AND status = 'Pending'
+            RETURNING id
+        """, (session["hr_user_id"], leave_id))
+        
+        if cur.fetchone():
+            conn.commit()
+            return jsonify({"success": True, "message": "Leave approved successfully"})
+        else:
+            return jsonify({"success": False, "message": "Leave request not found or already processed"}), 404
+            
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f"Error approving leave: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+        
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route("/hr/leave/reject/<int:leave_id>", methods=["POST"])
+def reject_leave(leave_id):
+    if "hr_user_id" not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    data = request.get_json()
+    rejection_reason = data.get("rejection_reason", "")
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            UPDATE leaves 
+            SET status = 'Rejected', 
+                approved_by = %s, 
+                approved_at = NOW(),
+                reason = CONCAT(reason, ' [Rejected: ', %s, ']')
+            WHERE id = %s AND status = 'Pending'
+            RETURNING id
+        """, (session["hr_user_id"], rejection_reason, leave_id))
+        
+        if cur.fetchone():
+            conn.commit()
+            return jsonify({"success": True, "message": "Leave rejected"})
+        else:
+            return jsonify({"success": False, "message": "Leave request not found or already processed"}), 404
+            
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f"Error rejecting leave: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+        
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route("/hr/leave/balance/<int:staff_id>")
+def get_leave_balance(staff_id):
+    if "hr_user_id" not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Calculate leave balance (assuming 20 days annual leave)
+        cur.execute("""
+            SELECT 
+                COALESCE(SUM(CASE 
+                    WHEN status = 'Approved' AND EXTRACT(YEAR FROM start_date) = EXTRACT(YEAR FROM CURRENT_DATE)
+                    THEN days_requested ELSE 0 END), 0) as days_taken
+            FROM leaves
+            WHERE staff_id = %s
+        """, (staff_id,))
+        
+        days_taken = cur.fetchone()[0] or 0
+        days_remaining = 20 - days_taken
+        
+        # Get upcoming leaves
+        cur.execute("""
+            SELECT leave_type, start_date, end_date, days_requested, status
+            FROM leaves
+            WHERE staff_id = %s AND start_date >= CURRENT_DATE
+            ORDER BY start_date
+            LIMIT 5
+        """, (staff_id,))
+        
+        upcoming = cur.fetchall()
+        
+        return jsonify({
+            "success": True,
+            "days_taken": days_taken,
+            "days_remaining": max(0, days_remaining),
+            "upcoming": [{
+                "type": u[0],
+                "start": u[1].strftime("%Y-%m-%d"),
+                "end": u[2].strftime("%Y-%m-%d"),
+                "days": u[3],
+                "status": u[4]
+            } for u in upcoming]
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching leave balance: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+        
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route("/hr/leave/export")
+def export_leave_report():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get all leave data for export
+        cur.execute("""
+            SELECT 
+                l.id,
+                s.staff_id as employee_id,
+                s.first_name || ' ' || s.last_name as staff_name,
+                d.name as department,
+                s.position,
+                l.leave_type,
+                l.start_date,
+                l.end_date,
+                l.days_requested,
+                l.reason,
+                l.status,
+                l.created_at,
+                l.approved_at,
+                hu.username as approved_by
+            FROM leaves l
+            JOIN staff s ON l.staff_id = s.id
+            LEFT JOIN departments d ON s.department_id = d.id
+            LEFT JOIN hr_users hu ON l.approved_by = hu.id
+            ORDER BY l.created_at DESC
+        """)
+        
+        leaves = cur.fetchall()
+        
+        # Create Excel workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Leave Report"
+        
+        # Add headers
+        headers = [
+            "Leave ID", "Employee ID", "Staff Name", "Department", "Position",
+            "Leave Type", "Start Date", "End Date", "Days Requested",
+            "Reason", "Status", "Requested Date", "Approved Date", "Approved By"
+        ]
+        ws.append(headers)
+        
+        # Style headers
+        from openpyxl.styles import Font, PatternFill, Alignment
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True)
+        
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+        
+        # Add data rows
+        for leave in leaves:
+            ws.append([
+                leave[0], leave[1], leave[2], leave[3], leave[4],
+                leave[5], leave[6], leave[7], leave[8],
+                leave[9], leave[10], leave[11], leave[12] or '', leave[13] or ''
+            ])
+        
+        # Auto-adjust column widths
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 30)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # Save to BytesIO
+        from io import BytesIO
+        stream = BytesIO()
+        wb.save(stream)
+        stream.seek(0)
+        
+        # Generate filename
+        filename = f"leave_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        return send_file(
+            stream,
+            as_attachment=True,
+            download_name=filename,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        
+    except Exception as e:
+        app.logger.error(f"Error exporting leave report: {e}")
+        flash(f"Error exporting report: {str(e)}", "danger")
+        return redirect(url_for("leave_management"))
+        
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route("/hr/leave/calendar")
+def leave_calendar():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    month = request.args.get("month", date.today().month, type=int)
+    year = request.args.get("year", date.today().year, type=int)
+    
+    start_date = date(year, month, 1)
+    if month == 12:
+        end_date = date(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        end_date = date(year, month + 1, 1) - timedelta(days=1)
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            SELECT 
+                l.start_date,
+                l.end_date,
+                l.leave_type,
+                l.status,
+                s.first_name,
+                s.last_name,
+                s.position,
+                d.name as department
+            FROM leaves l
+            JOIN staff s ON l.staff_id = s.id
+            LEFT JOIN departments d ON s.department_id = d.id
+            WHERE l.status IN ('Approved', 'Pending')
+                AND (l.start_date BETWEEN %s AND %s OR l.end_date BETWEEN %s AND %s)
+            ORDER BY l.start_date
+        """, (start_date, end_date, start_date, end_date))
+        
+        leaves = cur.fetchall()
+        
+        # Group leaves by date for calendar
+        calendar_data = {}
+        for leave in leaves:
+            current = max(leave[0], start_date)
+            end = min(leave[1], end_date)
+            
+            while current <= end:
+                date_str = current.strftime("%Y-%m-%d")
+                if date_str not in calendar_data:
+                    calendar_data[date_str] = []
+                
+                calendar_data[date_str].append({
+                    'type': leave[2],
+                    'status': leave[3],
+                    'staff_name': f"{leave[4]} {leave[5]}",
+                    'position': leave[6],
+                    'department': leave[7] or 'N/A'
+                })
+                current += timedelta(days=1)
+        
+        # Get months for navigation
+        months = [(i, month_name[i]) for i in range(1, 13)]
+        years = range(date.today().year - 2, date.today().year + 2)
+        
+    except Exception as e:
+        app.logger.error(f"Error generating leave calendar: {e}")
+        calendar_data = {}
+        months = [(i, month_name[i]) for i in range(1, 13)]
+        years = range(date.today().year - 2, date.today().year + 2)
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template(
+        "leave_calendar.html",
+        calendar_data=calendar_data,
+        month=month,
+        year=year,
+        months=months,
+        years=years,
+        start_date=start_date,
+        end_date=end_date,
+        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        current_year=date.today().year
+    )
+
+ # ==================== ROUTES: ATTENDANCE RECORD MODULE ====================
+
+@app.route("/hr/attendance-record")
+def attendance_record():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    # Get filter parameters
+    department_id = request.args.get("department_id", "")
+    staff_id = request.args.get("staff_id", "")
+    date_filter = request.args.get("date", date.today().strftime("%Y-%m-%d"))
+    status_filter = request.args.get("status", "")
+    
+    # Parse date
+    try:
+        selected_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
+    except:
+        selected_date = date.today()
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get attendance records for selected date with filters
+        query = """
+            SELECT 
+                a.id,
+                a.staff_id,
+                s.first_name,
+                s.last_name,
+                s.position,
+                d.name as department,
+                a.date,
+                a.check_in,
+                a.check_out,
+                a.status,
+                a.remarks,
+                a.created_at,
+                s.staff_id as employee_id
+            FROM attendance a
+            JOIN staff s ON a.staff_id = s.id
+            LEFT JOIN departments d ON s.department_id = d.id
+            WHERE a.date = %s
+        """
+        params = [selected_date]
+        
+        if department_id:
+            query += " AND s.department_id = %s"
+            params.append(department_id)
+        
+        if staff_id:
+            query += " AND a.staff_id = %s"
+            params.append(staff_id)
+        
+        if status_filter:
+            query += " AND a.status = %s"
+            params.append(status_filter)
+        
+        query += " ORDER BY s.first_name, s.last_name"
+        
+        cur.execute(query, params)
+        attendance_records = cur.fetchall()
+        
+        # Get all active staff for attendance marking
+        cur.execute("""
+            SELECT s.id, s.first_name, s.last_name, s.position, d.name as department
+            FROM staff s
+            LEFT JOIN departments d ON s.department_id = d.id
+            WHERE s.status = 'Active'
+            ORDER BY s.first_name, s.last_name
+        """)
+        all_staff = cur.fetchall()
+        
+        # Get departments for filter
+        cur.execute("SELECT id, name FROM departments WHERE status = 'Active' ORDER BY name")
+        departments = cur.fetchall()
+        
+        # Get staff for filter
+        cur.execute("""
+            SELECT id, first_name, last_name 
+            FROM staff 
+            WHERE status = 'Active' 
+            ORDER BY first_name, last_name
+        """)
+        staff_list = cur.fetchall()
+        
+        # Calculate statistics for selected date
+        cur.execute("""
+            SELECT 
+                COUNT(*) as total_present,
+                SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present,
+                SUM(CASE WHEN status = 'Late' THEN 1 ELSE 0 END) as late,
+                SUM(CASE WHEN status = 'Absent' THEN 1 ELSE 0 END) as absent,
+                SUM(CASE WHEN status = 'Half Day' THEN 1 ELSE 0 END) as half_day,
+                SUM(CASE WHEN status = 'Holiday' THEN 1 ELSE 0 END) as holiday
+            FROM attendance
+            WHERE date = %s
+        """, (selected_date,))
+        
+        stats = cur.fetchone()
+        
+        # Get total active staff count
+        cur.execute("SELECT COUNT(*) FROM staff WHERE status = 'Active'")
+        total_active = cur.fetchone()[0] or 0
+        
+        # Get recent attendance history (last 7 days)
+        week_ago = selected_date - timedelta(days=7)
+        cur.execute("""
+            SELECT 
+                date,
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present,
+                SUM(CASE WHEN status = 'Late' THEN 1 ELSE 0 END) as late,
+                SUM(CASE WHEN status = 'Absent' THEN 1 ELSE 0 END) as absent
+            FROM attendance
+            WHERE date BETWEEN %s AND %s
+            GROUP BY date
+            ORDER BY date DESC
+        """, (week_ago, selected_date))
+        
+        history = cur.fetchall()
+        
+        # Get staff without attendance for today
+        if selected_date == date.today():
+            marked_staff_ids = [r[1] for r in attendance_records]
+            unmarked_staff = [s for s in all_staff if s[0] not in marked_staff_ids]
+        else:
+            unmarked_staff = []
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching attendance data: {e}")
+        attendance_records = []
+        all_staff = []
+        departments = []
+        staff_list = []
+        stats = (0, 0, 0, 0, 0, 0)
+        total_active = 0
+        history = []
+        unmarked_staff = []
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    # Format attendance records for template
+    formatted_records = []
+    for record in attendance_records:
+        check_in = record[7]
+        check_out = record[8]
+        
+        # Calculate hours worked if both check-in and check-out exist
+        hours_worked = None
+        if check_in and check_out:
+            # Convert time to datetime for calculation
+            check_in_dt = datetime.combine(selected_date, check_in)
+            check_out_dt = datetime.combine(selected_date, check_out)
+            if check_out_dt < check_in_dt:  # Overnight shift
+                check_out_dt += timedelta(days=1)
+            hours_worked = (check_out_dt - check_in_dt).total_seconds() / 3600
+        
+        formatted_records.append({
+            'id': record[0],
+            'staff_id': record[1],
+            'first_name': record[2],
+            'last_name': record[3],
+            'staff_name': f"{record[2]} {record[3]}",
+            'position': record[4],
+            'department': record[5] or 'N/A',
+            'date': record[6],
+            'check_in': check_in.strftime("%H:%M") if check_in else None,
+            'check_out': check_out.strftime("%H:%M") if check_out else None,
+            'status': record[9],
+            'remarks': record[10],
+            'created_at': record[11],
+            'employee_id': record[12],
+            'hours_worked': round(hours_worked, 1) if hours_worked else None
+        })
+    
+    return render_template(
+        "attendance_record.html",
+        attendance_records=formatted_records,
+        all_staff=all_staff,
+        departments=departments,
+        staff_list=staff_list,
+        selected_date=selected_date,
+        selected_department=department_id,
+        selected_staff=staff_id,
+        selected_status=status_filter,
+        total_present=stats[1] or 0,
+        total_late=stats[2] or 0,
+        total_absent=stats[3] or 0,
+        total_half_day=stats[4] or 0,
+        total_holiday=stats[5] or 0,
+        total_marked=(stats[1] or 0) + (stats[2] or 0) + (stats[3] or 0) + (stats[4] or 0) + (stats[5] or 0),
+        total_active=total_active,
+        history=history,
+        unmarked_staff=unmarked_staff,
+        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        current_year=date.today().year
+    )
+
+
+@app.route("/hr/attendance/mark", methods=["POST"])
+def mark_attendance():
+    if "hr_user_id" not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    data = request.get_json()
+    staff_id = data.get("staff_id")
+    attendance_date = data.get("date")
+    check_in = data.get("check_in")
+    check_out = data.get("check_out")
+    status = data.get("status")
+    remarks = data.get("remarks", "")
+    
+    if not all([staff_id, attendance_date, status]):
+        return jsonify({"success": False, "message": "Missing required fields"}), 400
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Check if attendance already exists for this staff on this date
+        cur.execute("""
+            SELECT id FROM attendance 
+            WHERE staff_id = %s AND date = %s
+        """, (staff_id, attendance_date))
+        
+        existing = cur.fetchone()
+        
+        if existing:
+            # Update existing attendance
+            cur.execute("""
+                UPDATE attendance 
+                SET check_in = %s,
+                    check_out = %s,
+                    status = %s,
+                    remarks = %s,
+                    recorded_by = %s
+                WHERE id = %s
+                RETURNING id
+            """, (check_in, check_out, status, remarks, session["hr_user_id"], existing[0]))
+        else:
+            # Insert new attendance
+            cur.execute("""
+                INSERT INTO attendance (
+                    staff_id, date, check_in, check_out, status, remarks, recorded_by
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (staff_id, attendance_date, check_in, check_out, status, remarks, session["hr_user_id"]))
+        
+        attendance_id = cur.fetchone()[0]
+        conn.commit()
+        
+        return jsonify({
+            "success": True, 
+            "message": "Attendance marked successfully",
+            "attendance_id": attendance_id
+        })
+        
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f"Error marking attendance: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+        
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route("/hr/attendance/bulk-mark", methods=["POST"])
+def bulk_mark_attendance():
+    if "hr_user_id" not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    data = request.get_json()
+    attendance_date = data.get("date")
+    status = data.get("status")
+    staff_ids = data.get("staff_ids", [])
+    
+    if not all([attendance_date, status]) or not staff_ids:
+        return jsonify({"success": False, "message": "Missing required fields"}), 400
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        marked_count = 0
+        for staff_id in staff_ids:
+            # Check if attendance already exists
+            cur.execute("""
+                SELECT id FROM attendance 
+                WHERE staff_id = %s AND date = %s
+            """, (staff_id, attendance_date))
+            
+            existing = cur.fetchone()
+            
+            if existing:
+                # Update existing
+                cur.execute("""
+                    UPDATE attendance 
+                    SET status = %s,
+                        recorded_by = %s
+                    WHERE id = %s
+                """, (status, session["hr_user_id"], existing[0]))
+            else:
+                # Insert new
+                cur.execute("""
+                    INSERT INTO attendance (
+                        staff_id, date, status, recorded_by
+                    ) VALUES (%s, %s, %s, %s)
+                """, (staff_id, attendance_date, status, session["hr_user_id"]))
+            
+            marked_count += 1
+        
+        conn.commit()
+        
+        return jsonify({
+            "success": True, 
+            "message": f"Bulk attendance marked for {marked_count} staff members"
+        })
+        
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f"Error bulk marking attendance: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+        
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route("/hr/attendance/report")
+def attendance_report():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    # Get report parameters
+    report_type = request.args.get("type", "daily")
+    month = request.args.get("month", date.today().month, type=int)
+    year = request.args.get("year", date.today().year, type=int)
+    department_id = request.args.get("department_id", "")
+    staff_id = request.args.get("staff_id", "")
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        if report_type == "daily":
+            # Daily report for selected date
+            report_date = request.args.get("date", date.today().strftime("%Y-%m-%d"))
+            start_date = end_date = datetime.strptime(report_date, "%Y-%m-%d").date()
+            
+        elif report_type == "weekly":
+            # Weekly report
+            week_start = request.args.get("week_start")
+            if week_start:
+                start_date = datetime.strptime(week_start, "%Y-%m-%d").date()
+            else:
+                today = date.today()
+                start_date = today - timedelta(days=today.weekday())
+            end_date = start_date + timedelta(days=6)
+            
+        else:  # monthly
+            start_date = date(year, month, 1)
+            if month == 12:
+                end_date = date(year + 1, 1, 1) - timedelta(days=1)
+            else:
+                end_date = date(year, month + 1, 1) - timedelta(days=1)
+        
+        # Build query
+        query = """
+            SELECT 
+                a.date,
+                s.first_name || ' ' || s.last_name as staff_name,
+                s.position,
+                d.name as department,
+                a.check_in,
+                a.check_out,
+                a.status,
+                a.remarks,
+                EXTRACT(EPOCH FROM (a.check_out - a.check_in))/3600 as hours_worked
+            FROM attendance a
+            JOIN staff s ON a.staff_id = s.id
+            LEFT JOIN departments d ON s.department_id = d.id
+            WHERE a.date BETWEEN %s AND %s
+        """
+        params = [start_date, end_date]
+        
+        if department_id:
+            query += " AND s.department_id = %s"
+            params.append(department_id)
+        
+        if staff_id:
+            query += " AND a.staff_id = %s"
+            params.append(staff_id)
+        
+        query += " ORDER BY a.date DESC, d.name, s.first_name"
+        
+        cur.execute(query, params)
+        report_data = cur.fetchall()
+        
+        # Calculate summary statistics
+        cur.execute("""
+            SELECT 
+                COUNT(*) as total_records,
+                SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present,
+                SUM(CASE WHEN status = 'Late' THEN 1 ELSE 0 END) as late,
+                SUM(CASE WHEN status = 'Absent' THEN 1 ELSE 0 END) as absent,
+                SUM(CASE WHEN status = 'Half Day' THEN 1 ELSE 0 END) as half_day,
+                SUM(CASE WHEN status = 'Holiday' THEN 1 ELSE 0 END) as holiday
+            FROM attendance
+            WHERE date BETWEEN %s AND %s
+        """, (start_date, end_date))
+        
+        summary = cur.fetchone()
+        
+        # Get departments for filter
+        cur.execute("SELECT id, name FROM departments WHERE status = 'Active' ORDER BY name")
+        departments = cur.fetchall()
+        
+        # Get staff for filter
+        cur.execute("""
+            SELECT id, first_name, last_name 
+            FROM staff 
+            WHERE status = 'Active' 
+            ORDER BY first_name, last_name
+        """)
+        staff_list = cur.fetchall()
+        
+        # Get months for dropdown
+        months = [(i, month_name[i]) for i in range(1, 13)]
+        years = range(date.today().year - 2, date.today().year + 2)
+        
+    except Exception as e:
+        app.logger.error(f"Error generating attendance report: {e}")
+        report_data = []
+        summary = (0, 0, 0, 0, 0, 0)
+        departments = []
+        staff_list = []
+        months = [(i, month_name[i]) for i in range(1, 13)]
+        years = range(date.today().year - 2, date.today().year + 2)
+        start_date = date.today()
+        end_date = date.today()
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template(
+        "attendance_report.html",
+        report_data=report_data,
+        summary=summary,
+        report_type=report_type,
+        departments=departments,
+        staff_list=staff_list,
+        months=months,
+        years=years,
+        start_date=start_date,
+        end_date=end_date,
+        selected_month=month,
+        selected_year=year,
+        selected_department=department_id,
+        selected_staff=staff_id,
+        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        current_year=date.today().year
+    )
+
+
+@app.route("/hr/attendance/export")
+def export_attendance():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    # Get filter parameters (same as attendance_record)
+    department_id = request.args.get("department_id", "")
+    staff_id = request.args.get("staff_id", "")
+    start_date = request.args.get("start_date", (date.today() - timedelta(days=30)).strftime("%Y-%m-%d"))
+    end_date = request.args.get("end_date", date.today().strftime("%Y-%m-%d"))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Build query
+        query = """
+            SELECT 
+                a.date,
+                s.staff_id as employee_id,
+                s.first_name || ' ' || s.last_name as staff_name,
+                s.position,
+                d.name as department,
+                a.check_in,
+                a.check_out,
+                a.status,
+                a.remarks,
+                EXTRACT(EPOCH FROM (a.check_out - a.check_in))/3600 as hours_worked,
+                a.created_at
+            FROM attendance a
+            JOIN staff s ON a.staff_id = s.id
+            LEFT JOIN departments d ON s.department_id = d.id
+            WHERE a.date BETWEEN %s AND %s
+        """
+        params = [start_date, end_date]
+        
+        if department_id:
+            query += " AND s.department_id = %s"
+            params.append(department_id)
+        
+        if staff_id:
+            query += " AND a.staff_id = %s"
+            params.append(staff_id)
+        
+        query += " ORDER BY a.date DESC, d.name, s.first_name"
+        
+        cur.execute(query, params)
+        attendance_data = cur.fetchall()
+        
+        # Create Excel workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Attendance Report"
+        
+        # Add headers
+        headers = [
+            "Date", "Employee ID", "Staff Name", "Position", "Department",
+            "Check In", "Check Out", "Status", "Hours Worked", "Remarks", "Recorded At"
+        ]
+        ws.append(headers)
+        
+        # Style headers
+        from openpyxl.styles import Font, PatternFill, Alignment
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True)
+        
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+        
+        # Add data rows
+        for record in attendance_data:
+            ws.append([
+                record[0].strftime("%Y-%m-%d"),
+                record[1],
+                record[2],
+                record[3],
+                record[4] or 'N/A',
+                record[5].strftime("%H:%M") if record[5] else '',
+                record[6].strftime("%H:%M") if record[6] else '',
+                record[7],
+                round(record[8], 1) if record[8] else '',
+                record[9] or '',
+                record[10].strftime("%Y-%m-%d %H:%M") if record[10] else ''
+            ])
+        
+        # Auto-adjust column widths
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 30)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # Save to BytesIO
+        from io import BytesIO
+        stream = BytesIO()
+        wb.save(stream)
+        stream.seek(0)
+        
+        # Generate filename
+        filename = f"attendance_report_{start_date}_to_{end_date}.xlsx"
+        
+        return send_file(
+            stream,
+            as_attachment=True,
+            download_name=filename,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        
+    except Exception as e:
+        app.logger.error(f"Error exporting attendance: {e}")
+        flash(f"Error exporting report: {str(e)}", "danger")
+        return redirect(url_for("attendance_record"))
+        
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route("/hr/attendance/summary")
+def attendance_summary():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    # Get parameters
+    period = request.args.get("period", "month")
+    month = request.args.get("month", date.today().month, type=int)
+    year = request.args.get("year", date.today().year, type=int)
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        if period == "month":
+            start_date = date(year, month, 1)
+            if month == 12:
+                end_date = date(year + 1, 1, 1) - timedelta(days=1)
+            else:
+                end_date = date(year, month + 1, 1) - timedelta(days=1)
+        else:  # year
+            start_date = date(year, 1, 1)
+            end_date = date(year, 12, 31)
+        
+        # Get attendance summary by staff
+        cur.execute("""
+            SELECT 
+                s.id,
+                s.first_name || ' ' || s.last_name as staff_name,
+                s.position,
+                d.name as department,
+                COUNT(CASE WHEN a.status = 'Present' THEN 1 END) as present_days,
+                COUNT(CASE WHEN a.status = 'Late' THEN 1 END) as late_days,
+                COUNT(CASE WHEN a.status = 'Absent' THEN 1 END) as absent_days,
+                COUNT(CASE WHEN a.status = 'Half Day' THEN 1 END) as half_days,
+                COUNT(CASE WHEN a.status = 'Holiday' THEN 1 END) as holiday_days,
+                COUNT(a.id) as total_days,
+                ROUND(AVG(EXTRACT(EPOCH FROM (a.check_out - a.check_in))/3600), 1) as avg_hours
+            FROM staff s
+            LEFT JOIN departments d ON s.department_id = d.id
+            LEFT JOIN attendance a ON s.id = a.staff_id 
+                AND a.date BETWEEN %s AND %s
+            WHERE s.status = 'Active'
+            GROUP BY s.id, s.first_name, s.last_name, s.position, d.name
+            ORDER BY d.name, s.first_name
+        """, (start_date, end_date))
+        
+        staff_summary = cur.fetchall()
+        
+        # Get daily summary
+        cur.execute("""
+            SELECT 
+                a.date,
+                COUNT(DISTINCT a.staff_id) as staff_present,
+                COUNT(CASE WHEN a.status = 'Present' THEN 1 END) as present,
+                COUNT(CASE WHEN a.status = 'Late' THEN 1 END) as late,
+                COUNT(CASE WHEN a.status = 'Absent' THEN 1 END) as absent,
+                COUNT(CASE WHEN a.status = 'Half Day' THEN 1 END) as half_day
+            FROM attendance a
+            WHERE a.date BETWEEN %s AND %s
+            GROUP BY a.date
+            ORDER BY a.date
+        """, (start_date, end_date))
+        
+        daily_summary = cur.fetchall()
+        
+        # Get months for dropdown
+        months = [(i, month_name[i]) for i in range(1, 13)]
+        years = range(date.today().year - 2, date.today().year + 2)
+        
+    except Exception as e:
+        app.logger.error(f"Error generating attendance summary: {e}")
+        staff_summary = []
+        daily_summary = []
+        months = [(i, month_name[i]) for i in range(1, 13)]
+        years = range(date.today().year - 2, date.today().year + 2)
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template(
+        "attendance_summary.html",
+        staff_summary=staff_summary,
+        daily_summary=daily_summary,
+        period=period,
+        months=months,
+        years=years,
+        selected_month=month,
+        selected_year=year,
+        start_date=start_date,
+        end_date=end_date,
+        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        current_year=date.today().year
+    )
+
+
+@app.route("/hr/attendance/delete/<int:attendance_id>", methods=["POST"])
+def delete_attendance(attendance_id):
+    if "hr_user_id" not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("DELETE FROM attendance WHERE id = %s RETURNING id", (attendance_id,))
+        deleted = cur.fetchone()
+        conn.commit()
+        
+        if deleted:
+            return jsonify({"success": True, "message": "Attendance record deleted"})
+        else:
+            return jsonify({"success": False, "message": "Record not found"}), 404
+            
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f"Error deleting attendance: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+        
+    finally:
+        cur.close()
+        conn.close()  
+
+# ==================== ROUTES: DEPARTMENT MANAGEMENT MODULE ====================
+
+@app.route("/hr/departments")
+def departments():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get all departments with detailed statistics
+        cur.execute("""
+            SELECT 
+                d.id,
+                d.name,
+                d.code,
+                d.description,
+                d.head_of_dept,
+                d.status,
+                d.created_at,
+                COUNT(DISTINCT s.id) as staff_count,
+                COUNT(DISTINCT CASE WHEN s.status = 'Active' THEN s.id END) as active_staff,
+                COUNT(DISTINCT sch.id) as total_shifts,
+                COALESCE(SUM(CASE 
+                    WHEN a.status IN ('Present', 'Late') THEN 1 
+                    ELSE 0 
+                END), 0) as attendance_count
+            FROM departments d
+            LEFT JOIN staff s ON d.id = s.department_id
+            LEFT JOIN schedules sch ON s.id = sch.staff_id 
+                AND sch.schedule_date >= CURRENT_DATE
+            LEFT JOIN attendance a ON s.id = a.staff_id 
+                AND a.date = CURRENT_DATE
+            GROUP BY d.id, d.name, d.code, d.description, d.head_of_dept, d.status, d.created_at
+            ORDER BY d.name
+        """)
+        
+        departments_list = cur.fetchall()
+        
+        # Get staff count by department for chart
+        cur.execute("""
+            SELECT 
+                d.name,
+                COUNT(s.id) as staff_count
+            FROM departments d
+            LEFT JOIN staff s ON d.id = s.department_id
+            WHERE d.status = 'Active'
+            GROUP BY d.name
+            ORDER BY staff_count DESC
+        """)
+        chart_data = cur.fetchall()
+        
+        # Get department heads list
+        cur.execute("""
+            SELECT DISTINCT head_of_dept 
+            FROM departments 
+            WHERE head_of_dept IS NOT NULL 
+            ORDER BY head_of_dept
+        """)
+        dept_heads = cur.fetchall()
+        
+        # Statistics
+        cur.execute("SELECT COUNT(*) FROM departments WHERE status = 'Active'")
+        active_depts = cur.fetchone()[0] or 0
+        
+        cur.execute("SELECT COUNT(*) FROM staff WHERE department_id IS NOT NULL")
+        staff_with_dept = cur.fetchone()[0] or 0
+        
+        cur.execute("""
+            SELECT COALESCE(AVG(staff_count), 0)
+            FROM (
+                SELECT COUNT(*) as staff_count 
+                FROM staff 
+                WHERE department_id IS NOT NULL 
+                GROUP BY department_id
+            ) as dept_stats
+        """)
+        avg_staff_per_dept = cur.fetchone()[0] or 0
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching departments: {e}")
+        departments_list = []
+        chart_data = []
+        dept_heads = []
+        active_depts = 0
+        staff_with_dept = 0
+        avg_staff_per_dept = 0
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    # Format departments for template
+    formatted_depts = []
+    for dept in departments_list:
+        formatted_depts.append({
+            'id': dept[0],
+            'name': dept[1],
+            'code': dept[2],
+            'description': dept[3] or 'No description',
+            'head_of_dept': dept[4] or 'Not assigned',
+            'status': dept[5],
+            'created_at': dept[6],
+            'staff_count': dept[7] or 0,
+            'active_staff': dept[8] or 0,
+            'total_shifts': dept[9] or 0,
+            'attendance_count': dept[10] or 0,
+            'attendance_rate': round((dept[10] / dept[8] * 100) if dept[8] > 0 else 0, 1)
+        })
+    
+    return render_template(
+        "departments.html",
+        departments=formatted_depts,
+        chart_data=chart_data,
+        dept_heads=dept_heads,
+        active_depts=active_depts,
+        staff_with_dept=staff_with_dept,
+        avg_staff_per_dept=round(avg_staff_per_dept, 1),
+        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        current_year=date.today().year
+    )
+
+
+@app.route("/hr/departments/add", methods=["GET", "POST"])
+def add_department():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    if request.method == "POST":
+        name = request.form.get("name")
+        code = request.form.get("code")
+        description = request.form.get("description")
+        head_of_dept = request.form.get("head_of_dept")
+        status = request.form.get("status", "Active")
+        
+        # Validate required fields
+        if not all([name, code]):
+            flash("Department name and code are required", "danger")
+            return redirect(url_for("add_department"))
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        try:
+            # Check if code already exists
+            cur.execute("SELECT id FROM departments WHERE code = %s", (code,))
+            if cur.fetchone():
+                flash(f"Department code '{code}' already exists", "danger")
+                return redirect(url_for("add_department"))
+            
+            # Insert new department
+            cur.execute("""
+                INSERT INTO departments (name, code, description, head_of_dept, status)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
+            """, (name, code.upper(), description, head_of_dept, status))
+            
+            dept_id = cur.fetchone()[0]
+            conn.commit()
+            
+            flash(f"Department '{name}' added successfully!", "success")
+            return redirect(url_for("view_department", department_id=dept_id))
+            
+        except Exception as e:
+            conn.rollback()
+            app.logger.error(f"Error adding department: {e}")
+            flash(f"Error adding department: {str(e)}", "danger")
+            
+        finally:
+            cur.close()
+            conn.close()
+    
+    # GET request - show form
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get potential department heads (staff members)
+        cur.execute("""
+            SELECT id, first_name, last_name, position 
+            FROM staff 
+            WHERE status = 'Active'
+            ORDER BY first_name, last_name
+        """)
+        potential_heads = cur.fetchall()
+        
+    except Exception as e:
+        app.logger.error(f"Error loading form data: {e}")
+        potential_heads = []
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template(
+        "add_department.html",
+        potential_heads=potential_heads,
+        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        current_year=date.today().year
+    )
+
+
+@app.route("/hr/departments/<int:department_id>")
+def view_department(department_id):
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get department details
+        cur.execute("""
+            SELECT 
+                d.id,
+                d.name,
+                d.code,
+                d.description,
+                d.head_of_dept,
+                d.status,
+                d.created_at,
+                COUNT(DISTINCT s.id) as total_staff,
+                COUNT(DISTINCT CASE WHEN s.status = 'Active' THEN s.id END) as active_staff,
+                COUNT(DISTINCT sch.id) as upcoming_shifts,
+                COUNT(DISTINCT l.id) as pending_leaves
+            FROM departments d
+            LEFT JOIN staff s ON d.id = s.department_id
+            LEFT JOIN schedules sch ON s.id = sch.staff_id 
+                AND sch.schedule_date >= CURRENT_DATE
+            LEFT JOIN leaves l ON s.id = l.staff_id 
+                AND l.status = 'Pending'
+            WHERE d.id = %s
+            GROUP BY d.id, d.name, d.code, d.description, d.head_of_dept, d.status, d.created_at
+        """, (department_id,))
+        
+        department = cur.fetchone()
+        
+        if not department:
+            flash("Department not found", "danger")
+            return redirect(url_for("departments"))
+        
+        # Get staff in this department
+        cur.execute("""
+            SELECT 
+                s.id,
+                s.staff_id,
+                s.first_name,
+                s.last_name,
+                s.position,
+                s.email,
+                s.phone,
+                s.status,
+                s.hire_date,
+                s.salary,
+                COUNT(DISTINCT a.id) as attendance_count,
+                COUNT(DISTINCT sch.id) as shift_count
+            FROM staff s
+            LEFT JOIN attendance a ON s.id = a.staff_id 
+                AND a.date >= CURRENT_DATE - INTERVAL '30 days'
+            LEFT JOIN schedules sch ON s.id = sch.staff_id 
+                AND sch.schedule_date >= CURRENT_DATE
+            WHERE s.department_id = %s
+            GROUP BY s.id, s.staff_id, s.first_name, s.last_name, s.position, 
+                     s.email, s.phone, s.status, s.hire_date, s.salary
+            ORDER BY s.first_name, s.last_name
+        """, (department_id,))
+        
+        staff_list = cur.fetchall()
+        
+        # Get recent attendance for department (last 7 days)
+        cur.execute("""
+            SELECT 
+                a.date,
+                COUNT(CASE WHEN a.status = 'Present' THEN 1 END) as present,
+                COUNT(CASE WHEN a.status = 'Late' THEN 1 END) as late,
+                COUNT(CASE WHEN a.status = 'Absent' THEN 1 END) as absent,
+                COUNT(CASE WHEN a.status = 'Half Day' THEN 1 END) as half_day
+            FROM attendance a
+            JOIN staff s ON a.staff_id = s.id
+            WHERE s.department_id = %s
+                AND a.date >= CURRENT_DATE - INTERVAL '7 days'
+            GROUP BY a.date
+            ORDER BY a.date DESC
+        """, (department_id,))
+        
+        weekly_attendance = cur.fetchall()
+        
+        # Get upcoming schedules (next 7 days)
+        cur.execute("""
+            SELECT 
+                sch.id,
+                sch.schedule_date,
+                sch.start_time,
+                sch.end_time,
+                sch.shift_type,
+                s.first_name,
+                s.last_name,
+                s.position
+            FROM schedules sch
+            JOIN staff s ON sch.staff_id = s.id
+            WHERE s.department_id = %s
+                AND sch.schedule_date >= CURRENT_DATE
+                AND sch.schedule_date <= CURRENT_DATE + INTERVAL '7 days'
+            ORDER BY sch.schedule_date, sch.start_time
+            LIMIT 10
+        """, (department_id,))
+        
+        upcoming_schedules = cur.fetchall()
+        
+        # Get pending leave requests
+        cur.execute("""
+            SELECT 
+                l.id,
+                l.leave_type,
+                l.start_date,
+                l.end_date,
+                l.days_requested,
+                l.status,
+                s.first_name,
+                s.last_name
+            FROM leaves l
+            JOIN staff s ON l.staff_id = s.id
+            WHERE s.department_id = %s
+                AND l.status = 'Pending'
+            ORDER BY l.start_date
+            LIMIT 10
+        """, (department_id,))
+        
+        leave_requests = cur.fetchall()
+        
+        # Get department statistics
+        cur.execute("""
+            SELECT 
+                COALESCE(AVG(s.salary), 0) as avg_salary,
+                COUNT(DISTINCT CASE WHEN s.gender = 'Male' THEN s.id END) as male_count,
+                COUNT(DISTINCT CASE WHEN s.gender = 'Female' THEN s.id END) as female_count,
+                MIN(s.hire_date) as oldest_employee
+            FROM staff s
+            WHERE s.department_id = %s
+        """, (department_id,))
+        
+        dept_stats = cur.fetchone()
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching department details: {e}")
+        flash(f"Error loading department details: {str(e)}", "danger")
+        return redirect(url_for("departments"))
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    # Format department data
+    dept_dict = {
+        'id': department[0],
+        'name': department[1],
+        'code': department[2],
+        'description': department[3] or 'No description provided',
+        'head_of_dept': department[4] or 'Not assigned',
+        'status': department[5],
+        'created_at': department[6],
+        'total_staff': department[7] or 0,
+        'active_staff': department[8] or 0,
+        'upcoming_shifts': department[9] or 0,
+        'pending_leaves': department[10] or 0
+    }
+    
+    # Format staff list
+    formatted_staff = []
+    for staff in staff_list:
+        formatted_staff.append({
+            'id': staff[0],
+            'staff_id': staff[1],
+            'first_name': staff[2],
+            'last_name': staff[3],
+            'name': f"{staff[2]} {staff[3]}",
+            'position': staff[4] or 'N/A',
+            'email': staff[5] or 'N/A',
+            'phone': staff[6] or 'N/A',
+            'status': staff[7],
+            'hire_date': staff[8],
+            'salary': float(staff[9]) if staff[9] else 0,
+            'attendance_count': staff[10] or 0,
+            'shift_count': staff[11] or 0
+        })
+    
+    # Format weekly attendance
+    formatted_attendance = []
+    for att in weekly_attendance:
+        formatted_attendance.append({
+            'date': att[0],
+            'present': att[1] or 0,
+            'late': att[2] or 0,
+            'absent': att[3] or 0,
+            'half_day': att[4] or 0,
+            'total': (att[1] or 0) + (att[2] or 0) + (att[3] or 0) + (att[4] or 0)
+        })
+    
+    # Format upcoming schedules
+    formatted_schedules = []
+    for sch in upcoming_schedules:
+        formatted_schedules.append({
+            'id': sch[0],
+            'date': sch[1],
+            'start_time': sch[2],
+            'end_time': sch[3],
+            'shift_type': sch[4] or 'Regular',
+            'staff_name': f"{sch[5]} {sch[6]}",
+            'position': sch[7]
+        })
+    
+    # Format leave requests
+    formatted_leaves = []
+    for leave in leave_requests:
+        formatted_leaves.append({
+            'id': leave[0],
+            'type': leave[1],
+            'start_date': leave[2],
+            'end_date': leave[3],
+            'days': leave[4],
+            'status': leave[5],
+            'staff_name': f"{leave[6]} {leave[7]}"
+        })
+    
+    return render_template(
+        "view_department.html",
+        department=dept_dict,
+        staff_list=formatted_staff,
+        weekly_attendance=formatted_attendance,
+        upcoming_schedules=formatted_schedules,
+        leave_requests=formatted_leaves,
+        avg_salary=float(dept_stats[0]) if dept_stats else 0,
+        male_count=dept_stats[1] or 0 if dept_stats else 0,
+        female_count=dept_stats[2] or 0 if dept_stats else 0,
+        oldest_employee=dept_stats[3] if dept_stats else None,
+        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        current_year=date.today().year
+    )
+
+
+@app.route("/hr/departments/edit/<int:department_id>", methods=["GET", "POST"])
+def edit_department(department_id):
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    if request.method == "POST":
+        name = request.form.get("name")
+        code = request.form.get("code")
+        description = request.form.get("description")
+        head_of_dept = request.form.get("head_of_dept")
+        status = request.form.get("status")
+        
+        if not all([name, code]):
+            flash("Department name and code are required", "danger")
+            return redirect(url_for("edit_department", department_id=department_id))
+        
+        try:
+            # Check if code exists for other departments
+            cur.execute("""
+                SELECT id FROM departments 
+                WHERE code = %s AND id != %s
+            """, (code.upper(), department_id))
+            
+            if cur.fetchone():
+                flash(f"Department code '{code}' already exists", "danger")
+                return redirect(url_for("edit_department", department_id=department_id))
+            
+            # Update department
+            cur.execute("""
+                UPDATE departments 
+                SET name = %s,
+                    code = %s,
+                    description = %s,
+                    head_of_dept = %s,
+                    status = %s
+                WHERE id = %s
+                RETURNING id
+            """, (name, code.upper(), description, head_of_dept, status, department_id))
+            
+            updated = cur.fetchone()
+            conn.commit()
+            
+            if updated:
+                flash("Department updated successfully!", "success")
+                return redirect(url_for("view_department", department_id=department_id))
+            else:
+                flash("Department not found", "danger")
+                return redirect(url_for("departments"))
+            
+        except Exception as e:
+            conn.rollback()
+            app.logger.error(f"Error updating department: {e}")
+            flash(f"Error updating department: {str(e)}", "danger")
+    
+    # GET request - load department data
+    try:
+        cur.execute("SELECT * FROM departments WHERE id = %s", (department_id,))
+        department = cur.fetchone()
+        
+        if not department:
+            flash("Department not found", "danger")
+            return redirect(url_for("departments"))
+        
+        # Get potential department heads (active staff)
+        cur.execute("""
+            SELECT 
+                s.id,
+                s.first_name,
+                s.last_name,
+                s.position,
+                d.name as department_name
+            FROM staff s
+            LEFT JOIN departments d ON s.department_id = d.id
+            WHERE s.status = 'Active'
+            ORDER BY s.first_name, s.last_name
+        """)
+        potential_heads = cur.fetchall()
+        
+        # Format potential heads for template
+        formatted_heads = []
+        for head in potential_heads:
+            formatted_heads.append({
+                'id': head[0],
+                'name': f"{head[1]} {head[2]}",
+                'position': head[3],
+                'department': head[4] or 'No Department',
+                'full_title': f"{head[1]} {head[2]} - {head[3]} ({head[4] or 'No Dept'})"
+            })
+        
+    except Exception as e:
+        app.logger.error(f"Error loading department for edit: {e}")
+        flash("Error loading department details", "danger")
+        return redirect(url_for("departments"))
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    # Format department data
+    dept_dict = {
+        'id': department[0],
+        'name': department[1],
+        'code': department[2],
+        'description': department[3] or '',
+        'head_of_dept': department[4] or '',
+        'status': department[5],
+        'created_at': department[6]
+    }
+    
+    return render_template(
+        "edit_department.html",
+        department=dept_dict,
+        potential_heads=formatted_heads,
+        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        current_year=date.today().year
+    )
+
+
+@app.route("/hr/departments/delete/<int:department_id>", methods=["POST"])
+def delete_department(department_id):
+    if "hr_user_id" not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Check if department has staff
+        cur.execute("SELECT COUNT(*) FROM staff WHERE department_id = %s", (department_id,))
+        staff_count = cur.fetchone()[0]
+        
+        if staff_count > 0:
+            return jsonify({
+                "success": False, 
+                "message": f"Cannot delete department with {staff_count} staff members. Reassign staff first."
+            }), 400
+        
+        # Delete department
+        cur.execute("DELETE FROM departments WHERE id = %s RETURNING id", (department_id,))
+        deleted = cur.fetchone()
+        conn.commit()
+        
+        if deleted:
+            return jsonify({"success": True, "message": "Department deleted successfully"})
+        else:
+            return jsonify({"success": False, "message": "Department not found"}), 404
+            
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f"Error deleting department: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+        
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route("/hr/departments/assign-head", methods=["POST"])
+def assign_department_head():
+    if "hr_user_id" not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    data = request.get_json()
+    department_id = data.get("department_id")
+    staff_id = data.get("staff_id")
+    
+    if not all([department_id, staff_id]):
+        return jsonify({"success": False, "message": "Missing required fields"}), 400
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get staff name
+        cur.execute("""
+            SELECT first_name, last_name, position 
+            FROM staff 
+            WHERE id = %s
+        """, (staff_id,))
+        
+        staff = cur.fetchone()
+        if not staff:
+            return jsonify({"success": False, "message": "Staff not found"}), 404
+        
+        head_name = f"{staff[0]} {staff[1]} - {staff[2]}"
+        
+        # Update department head
+        cur.execute("""
+            UPDATE departments 
+            SET head_of_dept = %s 
+            WHERE id = %s
+            RETURNING id
+        """, (head_name, department_id))
+        
+        updated = cur.fetchone()
+        conn.commit()
+        
+        if updated:
+            return jsonify({
+                "success": True, 
+                "message": "Department head assigned successfully",
+                "head_name": head_name
+            })
+        else:
+            return jsonify({"success": False, "message": "Department not found"}), 404
+            
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f"Error assigning department head: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+        
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route("/hr/departments/analytics")
+def department_analytics():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Staff distribution by department
+        cur.execute("""
+            SELECT 
+                d.name,
+                COUNT(s.id) as total_staff,
+                SUM(CASE WHEN s.status = 'Active' THEN 1 ELSE 0 END) as active_staff,
+                SUM(CASE WHEN s.employment_type = 'Full-Time' THEN 1 ELSE 0 END) as full_time,
+                SUM(CASE WHEN s.employment_type = 'Part-Time' THEN 1 ELSE 0 END) as part_time,
+                SUM(CASE WHEN s.employment_type = 'Contract' THEN 1 ELSE 0 END) as contract
+            FROM departments d
+            LEFT JOIN staff s ON d.id = s.department_id
+            WHERE d.status = 'Active'
+            GROUP BY d.name
+            ORDER BY total_staff DESC
+        """)
+        staff_distribution = cur.fetchall()
+        
+        # Attendance rates by department (last 30 days)
+        cur.execute("""
+            WITH dept_attendance AS (
+                SELECT 
+                    d.id,
+                    d.name,
+                    COUNT(a.id) as total_attendance,
+                    SUM(CASE WHEN a.status IN ('Present', 'Late') THEN 1 ELSE 0 END) as present_count,
+                    COUNT(DISTINCT a.date) as working_days
+                FROM departments d
+                JOIN staff s ON d.id = s.department_id
+                LEFT JOIN attendance a ON s.id = a.staff_id 
+                    AND a.date >= CURRENT_DATE - INTERVAL '30 days'
+                WHERE d.status = 'Active'
+                GROUP BY d.id, d.name
+            )
+            SELECT 
+                name,
+                total_attendance,
+                present_count,
+                working_days,
+                CASE 
+                    WHEN working_days > 0 
+                    THEN ROUND((present_count::decimal / (working_days * COUNT_STAFF)) * 100, 1)
+                    ELSE 0 
+                END as attendance_rate
+            FROM dept_attendance
+            CROSS JOIN LATERAL (
+                SELECT COUNT(*) as COUNT_STAFF 
+                FROM staff 
+                WHERE department_id = dept_attendance.id
+            ) staff_count
+            ORDER BY attendance_rate DESC
+        """)
+        attendance_rates = cur.fetchall()
+        
+        # Leave statistics by department
+        cur.execute("""
+            SELECT 
+                d.name,
+                COUNT(l.id) as total_leaves,
+                SUM(CASE WHEN l.status = 'Approved' THEN 1 ELSE 0 END) as approved_leaves,
+                SUM(CASE WHEN l.status = 'Pending' THEN 1 ELSE 0 END) as pending_leaves,
+                SUM(l.days_requested) as total_days
+            FROM departments d
+            LEFT JOIN staff s ON d.id = s.department_id
+            LEFT JOIN leaves l ON s.id = l.staff_id
+                AND EXTRACT(YEAR FROM l.start_date) = EXTRACT(YEAR FROM CURRENT_DATE)
+            WHERE d.status = 'Active'
+            GROUP BY d.name
+            ORDER BY total_leaves DESC
+        """)
+        leave_stats = cur.fetchall()
+        
+        # Schedule coverage by department
+        cur.execute("""
+            SELECT 
+                d.name,
+                COUNT(DISTINCT sch.id) as total_shifts,
+                COUNT(DISTINCT sch.staff_id) as staff_scheduled,
+                COUNT(DISTINCT sch.schedule_date) as days_covered
+            FROM departments d
+            LEFT JOIN staff s ON d.id = s.department_id
+            LEFT JOIN schedules sch ON s.id = sch.staff_id
+                AND sch.schedule_date >= CURRENT_DATE
+            WHERE d.status = 'Active'
+            GROUP BY d.name
+            ORDER BY total_shifts DESC
+        """)
+        schedule_coverage = cur.fetchall()
+        
+        # Salary distribution by department
+        cur.execute("""
+            SELECT 
+                d.name,
+                ROUND(AVG(s.salary), 2) as avg_salary,
+                MIN(s.salary) as min_salary,
+                MAX(s.salary) as max_salary,
+                SUM(s.salary) as total_salary
+            FROM departments d
+            JOIN staff s ON d.id = s.department_id
+            WHERE d.status = 'Active' AND s.status = 'Active'
+            GROUP BY d.name
+            ORDER BY avg_salary DESC
+        """)
+        salary_stats = cur.fetchall()
+        
+    except Exception as e:
+        app.logger.error(f"Error generating department analytics: {e}")
+        staff_distribution = []
+        attendance_rates = []
+        leave_stats = []
+        schedule_coverage = []
+        salary_stats = []
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template(
+        "department_analytics.html",
+        staff_distribution=staff_distribution,
+        attendance_rates=attendance_rates,
+        leave_stats=leave_stats,
+        schedule_coverage=schedule_coverage,
+        salary_stats=salary_stats,
+        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        current_year=date.today().year
+    )
+
+
+@app.route("/hr/departments/export")
+def export_departments():
+    if "hr_user_id" not in session:
+        return redirect(url_for("hr_login"))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get all departments with statistics
+        cur.execute("""
+            SELECT 
+                d.name,
+                d.code,
+                d.head_of_dept,
+                d.status,
+                d.created_at,
+                COUNT(s.id) as total_staff,
+                SUM(CASE WHEN s.status = 'Active' THEN 1 ELSE 0 END) as active_staff,
+                COALESCE(AVG(s.salary), 0) as avg_salary
+            FROM departments d
+            LEFT JOIN staff s ON d.id = s.department_id
+            GROUP BY d.id, d.name, d.code, d.head_of_dept, d.status, d.created_at
+            ORDER BY d.name
+        """)
+        
+        departments = cur.fetchall()
+        
+        # Create Excel workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Departments Report"
+        
+        # Add headers
+        headers = [
+            "Department Name", "Code", "Head of Department", "Status",
+            "Created Date", "Total Staff", "Active Staff", "Average Salary (₦)"
+        ]
+        ws.append(headers)
+        
+        # Style headers
+        from openpyxl.styles import Font, PatternFill, Alignment
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True)
+        
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+        
+        # Add data rows
+        for dept in departments:
+            ws.append([
+                dept[0],
+                dept[1],
+                dept[2] or 'Not assigned',
+                dept[3],
+                dept[4].strftime("%Y-%m-%d") if dept[4] else '',
+                dept[5] or 0,
+                dept[6] or 0,
+                round(dept[7] or 0, 2)
+            ])
+        
+        # Auto-adjust column widths
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 30)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # Save to BytesIO
+        from io import BytesIO
+        stream = BytesIO()
+        wb.save(stream)
+        stream.seek(0)
+        
+        # Generate filename
+        filename = f"departments_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        return send_file(
+            stream,
+            as_attachment=True,
+            download_name=filename,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        
+    except Exception as e:
+        app.logger.error(f"Error exporting departments: {e}")
+        flash(f"Error exporting report: {str(e)}", "danger")
+        return redirect(url_for("departments"))
+        
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route("/api/departments/staff/<int:department_id>")
+def get_department_staff(department_id):
+    if "hr_user_id" not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            SELECT 
+                s.id,
+                s.staff_id,
+                s.first_name || ' ' || s.last_name as name,
+                s.position,
+                s.status
+            FROM staff s
+            WHERE s.department_id = %s AND s.status = 'Active'
+            ORDER BY s.first_name, s.last_name
+        """, (department_id,))
+        
+        staff = cur.fetchall()
+        
+        return jsonify({
+            "success": True,
+            "staff": [{
+                "id": s[0],
+                "staff_id": s[1],
+                "name": s[2],
+                "position": s[3],
+                "status": s[4]
+            } for s in staff]
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching department staff: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+        
+    finally:
+        cur.close()
+        conn.close() 
+    
 # -------------------- RUN APP --------------------
 if __name__ == "__main__":
     create_tables()  # Your existing tables

@@ -1,0 +1,742 @@
+<!-- templates/leave_management.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leave Management - HR Module</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --accent-color: #3498db;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+            --info-color: #17a2b8;
+            --light-bg: #f8f9fa;
+        }
+        
+        body {
+            background-color: #f4f6f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .navbar-brand {
+            font-weight: 600;
+            color: white !important;
+        }
+        
+        .nav-link {
+            color: rgba(255,255,255,0.9) !important;
+            transition: all 0.3s;
+        }
+        
+        .nav-link:hover {
+            color: white !important;
+            transform: translateY(-2px);
+        }
+        
+        .nav-link.active {
+            color: white !important;
+            font-weight: 600;
+            border-bottom: 2px solid var(--accent-color);
+        }
+        
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            margin-bottom: 25px;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        
+        .card-header {
+            background: white;
+            border-bottom: 2px solid #eef2f7;
+            padding: 1.2rem 1.5rem;
+            border-radius: 15px 15px 0 0 !important;
+        }
+        
+        .card-header h5 {
+            margin: 0;
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+        
+        .btn-primary {
+            background: var(--accent-color);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+        
+        .btn-success {
+            background: var(--success-color);
+            border: none;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+        }
+        
+        .btn-danger {
+            background: var(--danger-color);
+            border: none;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+        }
+        
+        .btn-outline-primary {
+            border: 2px solid var(--accent-color);
+            color: var(--accent-color);
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-weight: 500;
+        }
+        
+        .btn-outline-primary:hover {
+            background: var(--accent-color);
+            color: white;
+        }
+        
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-approved {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-rejected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            height: 100%;
+            transition: all 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        
+        .stat-icon {
+            font-size: 2.5rem;
+            color: var(--accent-color);
+            margin-bottom: 10px;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .table {
+            margin-bottom: 0;
+        }
+        
+        .table th {
+            background: #f8f9fa;
+            color: var(--primary-color);
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .table td {
+            vertical-align: middle;
+        }
+        
+        .leave-type-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            background: #e9ecef;
+            color: var(--primary-color);
+        }
+        
+        .modal-content {
+            border-radius: 15px;
+            border: none;
+        }
+        
+        .modal-header {
+            background: var(--primary-color);
+            color: white;
+            border-radius: 15px 15px 0 0;
+            padding: 1.2rem 1.5rem;
+        }
+        
+        .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+        }
+        
+        .modal-title {
+            font-weight: 600;
+        }
+        
+        .modal-body {
+            padding: 1.5rem;
+        }
+        
+        .modal-footer {
+            border-top: 2px solid #eef2f7;
+            padding: 1.2rem 1.5rem;
+        }
+        
+        .progress {
+            height: 8px;
+            border-radius: 4px;
+        }
+        
+        .footer {
+            background: white;
+            padding: 20px 0;
+            text-align: center;
+            color: #7f8c8d;
+            margin-top: 50px;
+            border-top: 1px solid #eef2f7;
+        }
+        
+        .nav-tabs {
+            border-bottom: 2px solid #eef2f7;
+        }
+        
+        .nav-tabs .nav-link {
+            color: var(--primary-color);
+            border: none;
+            padding: 10px 20px;
+            font-weight: 500;
+        }
+        
+        .nav-tabs .nav-link.active {
+            color: var(--accent-color);
+            border-bottom: 2px solid var(--accent-color);
+            background: transparent;
+        }
+        
+        .nav-tabs .nav-link:hover {
+            border-bottom: 2px solid var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('hr_dashboard') }}">
+                <i class="bi bi-hospital me-2"></i>Memorial Hospital Ovuru
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('hr_dashboard') }}">
+                            <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('staff_management') }}">
+                            <i class="bi bi-people me-1"></i>Staff
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('scheduling') }}">
+                            <i class="bi bi-calendar-check me-1"></i>Scheduling
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('leave_management') }}">
+                            <i class="bi bi-umbrella me-1"></i>Leave
+                        </a>
+                    </li>
+                </ul>
+                <span class="navbar-text me-3">
+                    <i class="bi bi-person-circle me-1"></i>{{ session.get('hr_full_name', 'HR User') }}
+                </span>
+                <a href="{{ url_for('hr_logout') }}" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-box-arrow-right me-1"></i>Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4">
+        <!-- Page Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="mb-1">
+                    <i class="bi bi-umbrella me-2 text-primary"></i>
+                    Leave Management
+                </h4>
+                <p class="text-muted mb-0">Manage staff leave requests and track leave balances</p>
+            </div>
+            <div>
+                <a href="{{ url_for('leave_calendar') }}" class="btn btn-outline-primary me-2">
+                    <i class="bi bi-calendar-week me-2"></i>Calendar View
+                </a>
+                <a href="{{ url_for('export_leave_report') }}" class="btn btn-outline-primary me-2">
+                    <i class="bi bi-download me-2"></i>Export Report
+                </a>
+                <a href="{{ url_for('request_leave') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle me-2"></i>New Leave Request
+                </a>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="bi bi-inbox"></i>
+                    </div>
+                    <div class="stat-value">{{ total_requests }}</div>
+                    <div class="stat-label">Total Requests</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon text-warning">
+                        <i class="bi bi-hourglass-split"></i>
+                    </div>
+                    <div class="stat-value">{{ pending_count }}</div>
+                    <div class="stat-label">Pending</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon text-success">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                    <div class="stat-value">{{ approved_count }}</div>
+                    <div class="stat-label">Approved</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon text-danger">
+                        <i class="bi bi-x-circle"></i>
+                    </div>
+                    <div class="stat-value">{{ rejected_count }}</div>
+                    <div class="stat-label">Rejected</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Main Content - Leave Requests -->
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <ul class="nav nav-tabs card-header-tabs" id="leaveTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
+                                    Pending <span class="badge bg-warning text-dark ms-2">{{ pending_leaves|length }}</span>
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="approved-tab" data-bs-toggle="tab" data-bs-target="#approved" type="button" role="tab">
+                                    Approved <span class="badge bg-success ms-2">{{ approved_leaves|length }}</span>
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="rejected-tab" data-bs-toggle="tab" data-bs-target="#rejected" type="button" role="tab">
+                                    Rejected <span class="badge bg-danger ms-2">{{ rejected_leaves|length }}</span>
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <div class="tab-content" id="leaveTabsContent">
+                            <!-- Pending Tab -->
+                            <div class="tab-pane fade show active" id="pending" role="tabpanel">
+                                {% if pending_leaves %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Staff</th>
+                                                <th>Department</th>
+                                                <th>Leave Type</th>
+                                                <th>Period</th>
+                                                <th>Days</th>
+                                                <th>Reason</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for leave in pending_leaves %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ leave.staff_name }}</strong><br>
+                                                    <small class="text-muted">{{ leave.position }}</small>
+                                                </td>
+                                                <td>{{ leave.department }}</td>
+                                                <td>
+                                                    <span class="leave-type-badge">{{ leave.leave_type }}</span>
+                                                </td>
+                                                <td>
+                                                    {{ leave.start_date.strftime('%d/%m/%Y') }}<br>
+                                                    <small>to {{ leave.end_date.strftime('%d/%m/%Y') }}</small>
+                                                </td>
+                                                <td><span class="badge bg-info">{{ leave.days_requested }} days</span></td>
+                                                <td>
+                                                    <span title="{{ leave.reason }}">
+                                                        {{ leave.reason[:30] }}{% if leave.reason and leave.reason|length > 30 %}...{% endif %}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-success btn-sm" onclick="approveLeave({{ leave.id }})">
+                                                        <i class="bi bi-check-circle"></i>
+                                                    </button>
+                                                    <button class="btn btn-danger btn-sm" onclick="rejectLeave({{ leave.id }})">
+                                                        <i class="bi bi-x-circle"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <div class="text-center py-5">
+                                    <i class="bi bi-check2-circle text-success" style="font-size: 3rem;"></i>
+                                    <h5 class="mt-3">No Pending Requests</h5>
+                                    <p class="text-muted">All leave requests have been processed.</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Approved Tab -->
+                            <div class="tab-pane fade" id="approved" role="tabpanel">
+                                {% if approved_leaves %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Staff</th>
+                                                <th>Leave Type</th>
+                                                <th>Period</th>
+                                                <th>Days</th>
+                                                <th>Approved Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for leave in approved_leaves %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ leave.staff_name }}</strong><br>
+                                                    <small class="text-muted">{{ leave.position }}</small>
+                                                </td>
+                                                <td>
+                                                    <span class="leave-type-badge">{{ leave.leave_type }}</span>
+                                                </td>
+                                                <td>
+                                                    {{ leave.start_date.strftime('%d/%m/%Y') }} - {{ leave.end_date.strftime('%d/%m/%Y') }}
+                                                </td>
+                                                <td><span class="badge bg-success">{{ leave.days_requested }} days</span></td>
+                                                <td>
+                                                    {% if leave.approved_at %}
+                                                        {{ leave.approved_at.strftime('%d/%m/%Y') }}
+                                                        <br><small class="text-muted">by {{ leave.approved_by_name }}</small>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <div class="text-center py-5">
+                                    <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
+                                    <p class="mt-3">No approved leave requests</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Rejected Tab -->
+                            <div class="tab-pane fade" id="rejected" role="tabpanel">
+                                {% if rejected_leaves %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Staff</th>
+                                                <th>Leave Type</th>
+                                                <th>Period</th>
+                                                <th>Days</th>
+                                                <th>Reason</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for leave in rejected_leaves %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ leave.staff_name }}</strong><br>
+                                                    <small class="text-muted">{{ leave.position }}</small>
+                                                </td>
+                                                <td>
+                                                    <span class="leave-type-badge">{{ leave.leave_type }}</span>
+                                                </td>
+                                                <td>
+                                                    {{ leave.start_date.strftime('%d/%m/%Y') }} - {{ leave.end_date.strftime('%d/%m/%Y') }}
+                                                </td>
+                                                <td><span class="badge bg-secondary">{{ leave.days_requested }} days</span></td>
+                                                <td>
+                                                    <span class="text-danger">{{ leave.reason }}</span>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <div class="text-center py-5">
+                                    <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+                                    <p class="mt-3">No rejected leave requests</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sidebar - Leave Balances and Types -->
+            <div class="col-lg-4">
+                <!-- Leave Balances -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-pie-chart me-2 text-info"></i>
+                            Leave Balances (Current Year)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if leave_balances %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Staff</th>
+                                        <th>Taken</th>
+                                        <th>Remaining</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for balance in leave_balances %}
+                                    <tr>
+                                        <td>
+                                            <small>{{ balance[1] }} {{ balance[2] }}</small><br>
+                                            <small class="text-muted">{{ balance[3] }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-warning">{{ balance[5] }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge {% if balance[6] < 5 %}bg-danger{% else %}bg-success{% endif %}">
+                                                {{ balance[6] }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted text-center mb-0">No leave balance data available</p>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Leave Types Distribution -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-bar-chart me-2 text-info"></i>
+                            Leave Types Distribution
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if leave_types %}
+                        {% for type in leave_types %}
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>{{ type[0] }}</span>
+                                <span class="badge bg-primary">{{ type[1] }} requests ({{ type[2] }} days)</span>
+                            </div>
+                            <div class="progress">
+                                {% set percentage = (type[1] / leave_types[0][1] * 100) if leave_types else 0 %}
+                                <div class="progress-bar bg-info" role="progressbar" style="width: {{ percentage }}%"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <p class="text-muted text-center mb-0">No leave data available</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reject Leave Modal -->
+    <div class="modal fade" id="rejectLeaveModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-x-circle me-2"></i>
+                        Reject Leave Request
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Reason for Rejection <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="rejection_reason" rows="3" 
+                                  placeholder="Please provide a reason for rejection..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" onclick="confirmReject()">
+                        <i class="bi bi-x-circle me-2"></i>Reject Request
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p class="mb-0">&copy; {{ current_year }} Memorial Hospital Ovuru, Nsukka, Enugu State. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentLeaveId = null;
+        
+        function approveLeave(leaveId) {
+            if (confirm('Are you sure you want to approve this leave request?')) {
+                fetch(`/hr/leave/approve/${leaveId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Leave request approved successfully!');
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while processing your request');
+                });
+            }
+        }
+        
+        function rejectLeave(leaveId) {
+            currentLeaveId = leaveId;
+            var modal = new bootstrap.Modal(document.getElementById('rejectLeaveModal'));
+            modal.show();
+        }
+        
+        function confirmReject() {
+            const reason = document.getElementById('rejection_reason').value;
+            
+            if (!reason) {
+                alert('Please provide a reason for rejection');
+                return;
+            }
+            
+            fetch(`/hr/leave/reject/${currentLeaveId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ rejection_reason: reason })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Leave request rejected');
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while processing your request');
+            });
+        }
+        
+        // Show flash messages
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    alert('{{ message }}');
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </script>
+</body>
+</html>
