@@ -430,7 +430,7 @@ def apply_stock_filter(stock, filter_type):
 # -------------------- ROUTES: LANDING & MODULES --------------------
 @app.route('/')
 def landing_page():
-    hospital_name = "Memorial Hospital Ovuru, Nsukka, Enugu State"
+    hospital_name = "John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State"
     modules = [
         "System Admin", "Patient Services", "Clinical Services",
         "Pharmacy", "Laboratory", "Radiology", "Billing and Revenue",
@@ -496,7 +496,7 @@ def drug_sales():
     return render_template(
         "drug_sales_dashboard.html",
         pharmacist_name=session.get('pharmacist_username'),
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State"
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State"
     )
 
 @app.route('/pharmacy/add-stock', methods=['GET', 'POST'])
@@ -626,7 +626,7 @@ def pharmacy_receipt():
     return render_template(
         "receipt.html",
         receipt=data,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         pharmacist_name=session.get('pharmacist_username')
     )
 
@@ -685,7 +685,7 @@ def reprint_receipt(receipt_no):
         "pharmacist": row[8], "date": row[9].strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    return render_template("receipt.html", receipt=receipt, hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+    return render_template("receipt.html", receipt=receipt, hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State")
 
 @app.route("/pharmacy/confirm-payment", methods=["POST"])
 def confirm_payment():
@@ -1000,7 +1000,7 @@ def view_receipt(receipt_id):
         "receipt.html",
         receipt=receipt,
         items=items,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State"
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State"
     )
 
 # -------------------- ROUTES: BILLING MODULE --------------------
@@ -1152,7 +1152,7 @@ def billing_receipt(payment_id):
         return render_template(
             "billing_receipt.html",
             receipt=receipt,
-            hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+            hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
             user_name=session.get("billing_username")
         )
 
@@ -1207,7 +1207,7 @@ def billing_receipt_page(payment_id):
         "date": row[10].strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    return render_template("billing_receipt.html", receipt=receipt, hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+    return render_template("billing_receipt.html", receipt=receipt, hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State")
 
 @app.route("/billing/receipt/<int:payment_id>")
 def view_payment_receipt(payment_id):
@@ -2103,7 +2103,7 @@ def hr_login():
         if not conn:
             flash("Database connection error", "danger")
             return render_template("hr_login.html", 
-                                 hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+                                 hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Enugu State")
 
         cur = conn.cursor()
 
@@ -2141,7 +2141,7 @@ def hr_login():
             flash("Login error. Please try again.", "danger")
 
     return render_template("hr_login.html", 
-                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")    
+                         hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State")    
 
 
 # @app.route("/hr/scheduling")
@@ -2311,7 +2311,7 @@ def hr_dashboard():
     
     return render_template(
         "hr_dashboard.html",
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         total_staff=total_staff,
         active_staff=active_staff,
         on_leave=on_leave,
@@ -2388,7 +2388,7 @@ def staff_management():
                          active_staff=active_staff,
                          on_contract=on_contract,
                          departments_count=departments_count,
-                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+                         hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
                          current_year=date.today().year)    
 # View Staff Details
 @app.route("/hr/staff/<int:staff_id>")
@@ -2466,7 +2466,7 @@ def view_staff(staff_id):
                          staff=staff_dict,
                          today=today,
                          employment_duration=employment_duration,
-                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+                         hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State")
 # Add New Staff
 @app.route("/hr/staff/add", methods=["GET", "POST"])
 def add_staff():
@@ -2593,7 +2593,7 @@ def add_staff():
                          departments=departments,
                          suggested_id=suggested_id,
                          today=today,
-                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+                         hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State")
 
 # Edit Staff
 @app.route("/hr/staff/edit/<int:staff_id>", methods=["GET", "POST"])
@@ -2675,7 +2675,7 @@ def edit_staff(staff_id):
     return render_template("edit_staff.html",
                          staff=staff,
                          departments=departments,
-                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+                         hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State")
 
 
 # ==================== ROUTES: SCHEDULING MODULE ====================
@@ -2750,7 +2750,7 @@ def scheduling():
                          departments=departments,
                          staff_list=staff_list,
                          current_month=current_month.strftime("%B %Y"),
-                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+                         hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State")
     
     
 @app.route("/hr/scheduling/create", methods=["GET", "POST"])
@@ -2837,7 +2837,7 @@ def create_schedule():
     return render_template("create_schedule.html",
                          staff_list=staff_list,
                          tomorrow=tomorrow,
-                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+                         hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State")
 
 @app.route("/hr/scheduling/roster")
 def view_roster():
@@ -2965,7 +2965,7 @@ def view_roster():
                          total_shifts=total_shifts,
                          unique_staff=unique_staff,
                          unique_departments=unique_departments,
-                         hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+                         hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State")
 @app.route("/hr/scheduling/shift-swap", methods=["GET", "POST"])
 def shift_swap():
     if "hr_user_id" not in session:
@@ -3253,7 +3253,7 @@ def shift_swap():
         staff_list=formatted_staff,
         pending_count=pending_count,
         approved_30days=approved_30days,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         current_year=date.today().year
     )
     
@@ -3494,7 +3494,7 @@ def schedule_reports():
         unique_staff=unique_staff,
         avg_hours_per_shift=avg_hours_per_shift,
         avg_staff_per_day=avg_staff_per_day,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         current_year=date.today().year
     )
 
@@ -3593,7 +3593,7 @@ def delete_schedule(schedule_id):
 #                          departments=departments,
 #                          staff_list=staff_list,
 #                          current_month=current_month.strftime("%B %Y"),
-#                          hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+#                          hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State")
 
 
 
@@ -3800,7 +3800,7 @@ def leave_management():
         rejected_count=stats[3],
         leave_balances=leave_balances,
         leave_types=leave_types,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         current_year=date.today().year
     )
 
@@ -3908,7 +3908,7 @@ def request_leave():
         staff_list=staff_list,
         leave_types=leave_types,
         today=date.today().strftime("%Y-%m-%d"),
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State"
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State"
     )
 
 
@@ -4225,7 +4225,7 @@ def leave_calendar():
         years=years,
         start_date=start_date,
         end_date=end_date,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         current_year=date.today().year
     )
 
@@ -4426,7 +4426,7 @@ def attendance_record():
         total_active=total_active,
         history=history,
         unmarked_staff=unmarked_staff,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         current_year=date.today().year
     )
 
@@ -4693,7 +4693,7 @@ def attendance_report():
         selected_year=year,
         selected_department=department_id,
         selected_staff=staff_id,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         current_year=date.today().year
     )
 
@@ -4916,7 +4916,7 @@ def attendance_summary():
         selected_year=year,
         start_date=start_date,
         end_date=end_date,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         current_year=date.today().year
     )
 
@@ -5067,7 +5067,7 @@ def departments():
         active_depts=active_depts,
         staff_with_dept=staff_with_dept,
         avg_staff_per_dept=round(avg_staff_per_dept, 1),
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         current_year=date.today().year
     )
 
@@ -5146,9 +5146,9 @@ def add_department():
     return render_template(
         "add_department.html",
         potential_heads=potential_heads,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         current_year=date.today().year
-    )
+        )
 
 
 @app.route("/hr/departments/<int:department_id>")
@@ -5384,7 +5384,7 @@ def view_department(department_id):
         male_count=dept_stats[1] or 0 if dept_stats else 0,
         female_count=dept_stats[2] or 0 if dept_stats else 0,
         oldest_employee=dept_stats[3] if dept_stats else None,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         current_year=date.today().year
     )
 
@@ -5505,7 +5505,7 @@ def edit_department(department_id):
         "edit_department.html",
         department=dept_dict,
         potential_heads=formatted_heads,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         current_year=date.today().year
     )
 
@@ -5740,7 +5740,7 @@ def department_analytics():
         leave_stats=leave_stats,
         schedule_coverage=schedule_coverage,
         salary_stats=salary_stats,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         current_year=date.today().year
     )
 

@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Department Analytics - John-Theresa Spiritan Specialist Hospital, Uvuru HR System</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+        }
+
+        /* Top Navbar */
+        .top-navbar {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 15px 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar-brand h2 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .navbar-brand p {
+            margin: 0;
+            font-size: 0.8rem;
+            opacity: 0.9;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-name {
+            font-weight: 500;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+            color: white;
+        }
+
+        /* Navigation Tabs */
+        .nav-tabs {
+            background: white;
+            padding: 0 30px;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .nav-tabs .nav-link {
+            color: #1e3c72;
+            font-weight: 500;
+            border: none;
+            padding: 12px 20px;
+        }
+
+        .nav-tabs .nav-link:hover {
+            border-bottom: 2px solid #1e3c72;
+        }
+
+        .nav-tabs .nav-link.active {
+            color: #1e3c72;
+            border-bottom: 2px solid #1e3c72;
+            background: transparent;
+        }
+
+        /* Content Area */
+        .content-area {
+            padding: 30px;
+        }
+
+        /* Cards */
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .stat-card .stat-icon {
+            font-size: 2rem;
+            color: #1e3c72;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .stat-card .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        /* Chart Containers */
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .chart-container canvas {
+            max-height: 300px;
+        }
+
+        /* Tables */
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+
+        .table {
+            margin-bottom: 0;
+        }
+
+        .table thead th {
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            font-weight: 600;
+            color: #1e3c72;
+        }
+
+        .table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        /* Progress Bar */
+        .progress {
+            height: 8px;
+            border-radius: 4px;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #1e3c72, #2a5298);
+        }
+
+        /* Badges */
+        .badge-active {
+            background: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+        }
+
+        .badge-inactive {
+            background: #dc3545;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+        }
+
+        /* Footer */
+        .footer {
+            background: white;
+            padding: 20px 30px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #dee2e6;
+            margin-top: 30px;
+        }
+
+        /* Alert Messages */
+        .alert {
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .top-navbar {
+                flex-direction: column;
+                text-align: center;
+                gap: 10px;
+            }
+            
+            .content-area {
+                padding: 15px;
+            }
+            
+            .stat-card .stat-value {
+                font-size: 1.2rem;
+            }
+        }
+
+        /* Summary Cards Row */
+        .summary-cards {
+            margin-bottom: 30px;
+        }
+
+        /* Section Headers */
+        .section-header {
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #1e3c72;
+        }
+
+        .section-header h4 {
+            color: #1e3c72;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Navbar -->
+    <div class="top-navbar">
+        <div class="navbar-brand">
+            <h2><i class="fas fa-chart-line"></i> Department Analytics</h2>
+            <p>John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State</p>
+        </div>
+        <div class="user-info">
+            <span class="user-name">
+                <a href="{{ url_for('hr_dashboard') }}" class="back-btn">
+                <i class="fas fa-user-circle"></i> HR Dashboard
+                    </a>
+            </span>
+            <a href="{{ url_for('hr_logout') }}" class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs" id="analyticsTab" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" id="staff-tab" data-bs-toggle="tab" href="#staff" role="tab">
+                <i class="fas fa-users"></i> Staff Distribution
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="attendance-tab" data-bs-toggle="tab" href="#attendance" role="tab">
+                <i class="fas fa-clock"></i> Attendance Rates
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="leave-tab" data-bs-toggle="tab" href="#leave" role="tab">
+                <i class="fas fa-calendar-alt"></i> Leave Statistics
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="schedule-tab" data-bs-toggle="tab" href="#schedule" role="tab">
+                <i class="fas fa-calendar-week"></i> Schedule Coverage
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="salary-tab" data-bs-toggle="tab" href="#salary" role="tab">
+                <i class="fas fa-money-bill-wave"></i> Salary Analysis
+            </a>
+        </li>
+    </ul>
+
+    <!-- Content Area -->
+    <div class="content-area">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        <i class="fas fa-info-circle"></i> {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="analyticsTabContent">
+            
+            <!-- Staff Distribution Tab -->
+            <div class="tab-pane fade show active" id="staff" role="tabpanel">
+                <div class="row summary-cards">
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-building"></i>
+                            </div>
+                            <div class="stat-value">{{ staff_distribution|length }}</div>
+                            <div class="stat-label">Total Departments</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="stat-value">
+                                {% set total = 0 %}
+                                {% for dept in staff_distribution %}
+                                    {% set total = total + dept[1] %}
+                                {% endfor %}
+                                {{ total }}
+                            </div>
+                            <div class="stat-label">Total Staff</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-user-check"></i>
+                            </div>
+                            <div class="stat-value">
+                                {% set active = 0 %}
+                                {% for dept in staff_distribution %}
+                                    {% set active = active + dept[2] %}
+                                {% endfor %}
+                                {{ active }}
+                            </div>
+                            <div class="stat-label">Active Staff</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-chart-bar"></i>
+                            </div>
+                            <div class="stat-value">
+                                {% set total_staff = 0 %}
+                                {% for dept in staff_distribution %}
+                                    {% set total_staff = total_staff + dept[1] %}
+                                {% endfor %}
+                                {% if staff_distribution|length > 0 %}
+                                    {{ "%.1f"|format(total_staff / staff_distribution|length) }}
+                                {% else %}
+                                    0
+                                {% endif %}
+                            </div>
+                            <div class="stat-label">Avg Staff/Dept</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="table-container">
+                            <h5><i class="fas fa-table"></i> Staff Distribution by Department</h5>
+                            <hr>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Department</th>
+                                            <th>Total Staff</th>
+                                            <th>Active Staff</th>
+                                            <th>Full-Time</th>
+                                            <th>Part-Time</th>
+                                            <th>Contract</th>
+                                            <th>% of Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% set total_staff_all = 0 %}
+                                        {% for dept in staff_distribution %}
+                                            {% set total_staff_all = total_staff_all + dept[1] %}
+                                        {% endfor %}
+                                        
+                                        {% for dept in staff_distribution %}
+                                        <tr>
+                                            <td><strong>{{ dept[0] }}</strong></td>
+                                            <td>{{ dept[1] }}</td>
+                                            <td>{{ dept[2] }}</td>
+                                            <td>{{ dept[3] }}</td>
+                                            <td>{{ dept[4] }}</td>
+                                            <td>{{ dept[5] }}</td>
+                                            <td>
+                                                {% set percentage = (dept[1] / total_staff_all * 100) if total_staff_all > 0 else 0 %}
+                                                <div class="progress">
+                                                    <div class="progress-bar" role="progressbar" 
+                                                         style="width: {{ percentage }}%;"
+                                                         aria-valuenow="{{ percentage }}" 
+                                                         aria-valuemin="0" aria-valuemax="100">
+                                                        {{ "%.1f"|format(percentage) }}%
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="chart-container">
+                            <h5><i class="fas fa-chart-pie"></i> Staff Distribution</h5>
+                            <hr>
+                            <canvas id="staffPieChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attendance Rates Tab -->
+            <div class="tab-pane fade" id="attendance" role="tabpanel">
+                <div class="row summary-cards">
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="stat-value">
+                                {% set total_rate = 0 %}
+                                {% for att in attendance_rates %}
+                                    {% set total_rate = total_rate + att[4] %}
+                                {% endfor %}
+                                {% if attendance_rates|length > 0 %}
+                                    {{ "%.1f"|format(total_rate / attendance_rates|length) }}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </div>
+                            <div class="stat-label">Avg Attendance Rate</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="stat-value">
+                                {% set total_present = 0 %}
+                                {% for att in attendance_rates %}
+                                    {% set total_present = total_present + att[2] %}
+                                {% endfor %}
+                                {{ total_present }}
+                            </div>
+                            <div class="stat-label">Total Present Days</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="stat-value">
+                                {% set total_records = 0 %}
+                                {% for att in attendance_rates %}
+                                    {% set total_records = total_records + att[1] %}
+                                {% endfor %}
+                                {{ total_records }}
+                            </div>
+                            <div class="stat-label">Total Attendance Records</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <h5><i class="fas fa-chart-line"></i> Attendance Rates by Department (Last 30 Days)</h5>
+                    <hr>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Department</th>
+                                    <th>Attendance Rate</th>
+                                    <th>Present Days</th>
+                                    <th>Total Records</th>
+                                    <th>Working Days</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for att in attendance_rates %}
+                                <tr>
+                                    <td><strong>{{ att[0] }}</strong></td>
+                                    <td style="width: 200px;">
+                                        <div class="progress">
+                                            <div class="progress-bar" role="progressbar" 
+                                                 style="width: {{ att[4] }}%; background: {{ '#28a745' if att[4] >= 90 else '#ffc107' if att[4] >= 75 else '#dc3545' }};"
+                                                 aria-valuenow="{{ att[4] }}" 
+                                                 aria-valuemin="0" aria-valuemax="100">
+                                                {{ att[4] }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ att[2] }}</td>
+                                    <td>{{ att[1] }}</td>
+                                    <td>{{ att[3] }}</td>
+                                    <td>
+                                        {% if att[4] >= 90 %}
+                                            <span class="badge-active"><i class="fas fa-check"></i> Excellent</span>
+                                        {% elif att[4] >= 75 %}
+                                            <span class="badge" style="background: #ffc107; color: #333; padding: 5px 10px; border-radius: 20px;">Good</span>
+                                        {% elif att[4] >= 60 %}
+                                            <span class="badge" style="background: #fd7e14; color: white; padding: 5px 10px; border-radius: 20px;">Average</span>
+                                        {% else %}
+                                            <span class="badge-inactive"><i class="fas fa-exclamation-triangle"></i> Poor</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leave Statistics Tab -->
+            <div class="tab-pane fade" id="leave" role="tabpanel">
+                <div class="row summary-cards">
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-calendar-check"></i>
+                            </div>
+                            <div class="stat-value">
+                                {% set total_leaves = 0 %}
+                                {% for leave in leave_stats %}
+                                    {% set total_leaves = total_leaves + leave[1] %}
+                                {% endfor %}
+                                {{ total_leaves }}
+                            </div>
+                            <div class="stat-label">Total Leave Requests</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="stat-value">
+                                {% set total_approved = 0 %}
+                                {% for leave in leave_stats %}
+                                    {% set total_approved = total_approved + leave[2] %}
+                                {% endfor %}
+                                {{ total_approved }}
+                            </div>
+                            <div class="stat-label">Approved Leaves</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-hourglass-half"></i>
+                            </div>
+                            <div class="stat-value">
+                                {% set total_pending = 0 %}
+                                {% for leave in leave_stats %}
+                                    {% set total_pending = total_pending + leave[3] %}
+                                {% endfor %}
+                                {{ total_pending }}
+                            </div>
+                            <div class="stat-label">Pending Leaves</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <h5><i class="fas fa-calendar-alt"></i> Leave Statistics by Department (Current Year)</h5>
+                    <hr>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Department</th>
+                                    <th>Total Leaves</th>
+                                    <th>Approved</th>
+                                    <th>Pending</th>
+                                    <th>Total Days</th>
+                                    <th>Avg Days/Request</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for leave in leave_stats %}
+                                <tr>
+                                    <td><strong>{{ leave[0] }}</strong></td>
+                                    <td>{{ leave[1] }}</td>
+                                    <td><span class="badge-active">{{ leave[2] }}</span></td>
+                                    <td><span class="badge" style="background: #ffc107; color: #333; padding: 5px 10px; border-radius: 20px;">{{ leave[3] }}</span></td>
+                                    <td>{{ leave[4] }}</td>
+                                    <td>{{ "%.1f"|format(leave[4] / leave[1] if leave[1] > 0 else 0) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Schedule Coverage Tab -->
+            <div class="tab-pane fade" id="schedule" role="tabpanel">
+                <div class="row summary-cards">
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-calendar-week"></i>
+                            </div>
+                            <div class="stat-value">
+                                {% set total_shifts = 0 %}
+                                {% for schedule in schedule_coverage %}
+                                    {% set total_shifts = total_shifts + schedule[1] %}
+                                {% endfor %}
+                                {{ total_shifts }}
+                            </div>
+                            <div class="stat-label">Total Scheduled Shifts</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-user-clock"></i>
+                            </div>
+                            <div class="stat-value">
+                                {% set total_staff_scheduled = 0 %}
+                                {% for schedule in schedule_coverage %}
+                                    {% set total_staff_scheduled = total_staff_scheduled + schedule[2] %}
+                                {% endfor %}
+                                {{ total_staff_scheduled }}
+                            </div>
+                            <div class="stat-label">Staff Scheduled</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-calendar-day"></i>
+                            </div>
+                            <div class="stat-value">
+                                {% set total_days = 0 %}
+                                {% for schedule in schedule_coverage %}
+                                    {% set total_days = total_days + schedule[3] %}
+                                {% endfor %}
+                                {{ total_days }}
+                            </div>
+                            <div class="stat-label">Days Covered</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <h5><i class="fas fa-calendar-week"></i> Schedule Coverage by Department</h5>
+                    <hr>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Department</th>
+                                    <th>Total Shifts</th>
+                                    <th>Staff Scheduled</th>
+                                    <th>Days Covered</th>
+                                    <th>Avg Shifts/Day</th>
+                                    <th>Coverage Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for schedule in schedule_coverage %}
+                                <tr>
+                                    <td><strong>{{ schedule[0] }}</strong></td>
+                                    <td>{{ schedule[1] }}</td>
+                                    <td>{{ schedule[2] }}</td>
+                                    <td>{{ schedule[3] }}</td>
+                                    <td>{{ "%.1f"|format(schedule[1] / schedule[3] if schedule[3] > 0 else 0) }}</td>
+                                    <td>
+                                        {% set dept_staff = 0 %}
+                                        {% for dept in staff_distribution %}
+                                            {% if dept[0] == schedule[0] %}
+                                                {% set dept_staff = dept[1] %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% set coverage = (schedule[2] / dept_staff * 100) if dept_staff > 0 else 0 %}
+                                        <div class="progress">
+                                            <div class="progress-bar" role="progressbar" 
+                                                 style="width: {{ coverage }}%;"
+                                                 aria-valuenow="{{ coverage }}" 
+                                                 aria-valuemin="0" aria-valuemax="100">
+                                                {{ "%.0f"|format(coverage) }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Salary Analysis Tab -->
+            <div class="tab-pane fade" id="salary" role="tabpanel">
+                <div class="row summary-cards">
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="stat-value">
+                                ₦
+                                {% set total_salary = 0 %}
+                                {% for salary in salary_stats %}
+                                    {% set total_salary = total_salary + salary[1] %}
+                                {% endfor %}
+                                {% if salary_stats|length > 0 %}
+                                    {{ (total_salary / salary_stats|length)|int|replace('.', ',') }}
+                                {% else %}
+                                    0
+                                {% endif %}
+                            </div>
+                            <div class="stat-label">Avg Salary (Overall)</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-arrow-up"></i>
+                            </div>
+                            <div class="stat-value">
+                                ₦
+                                {% set max_salary = 0 %}
+                                {% for salary in salary_stats %}
+                                    {% if salary[3] > max_salary %}
+                                        {% set max_salary = salary[3] %}
+                                    {% endif %}
+                                {% endfor %}
+                                {{ max_salary|int|replace('.', ',') }}
+                            </div>
+                            <div class="stat-label">Highest Salary</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-arrow-down"></i>
+                            </div>
+                            <div class="stat-value">
+                                ₦
+                                {% set min_salary = 999999999 %}
+                                {% for salary in salary_stats %}
+                                    {% if salary[2] < min_salary %}
+                                        {% set min_salary = salary[2] %}
+                                    {% endif %}
+                                {% endfor %}
+                                {{ min_salary|int|replace('.', ',') }}
+                            </div>
+                            <div class="stat-label">Lowest Salary</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-money-bill-wave"></i>
+                            </div>
+                            <div class="stat-value">
+                                ₦
+                                {% set total_budget = 0 %}
+                                {% for salary in salary_stats %}
+                                    {% set total_budget = total_budget + salary[4] %}
+                                {% endfor %}
+                                {{ total_budget|int|replace('.', ',') }}
+                            </div>
+                            <div class="stat-label">Total Salary Budget</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="table-container">
+                            <h5><i class="fas fa-money-bill-wave"></i> Salary Distribution by Department</h5>
+                            <hr>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Department</th>
+                                            <th>Average Salary (₦)</th>
+                                            <th>Minimum Salary (₦)</th>
+                                            <th>Maximum Salary (₦)</th>
+                                            <th>Total Budget (₦)</th>
+                                            <th>vs Avg</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% set overall_avg = 0 %}
+                                        {% for salary in salary_stats %}
+                                            {% set overall_avg = overall_avg + salary[1] %}
+                                        {% endfor %}
+                                        {% if salary_stats|length > 0 %}
+                                            {% set overall_avg = overall_avg / salary_stats|length %}
+                                        {% endif %}
+                                        
+                                        {% for salary in salary_stats %}
+                                        <tr>
+                                            <td><strong>{{ salary[0] }}</strong></td>
+                                            <td>₦{{ salary[1]|int|replace('.', ',') }}</td>
+                                            <td>₦{{ salary[2]|int|replace('.', ',') }}</td>
+                                            <td>₦{{ salary[3]|int|replace('.', ',') }}</td>
+                                            <td>₦{{ salary[4]|int|replace('.', ',') }}</td>
+                                            <td>
+                                                {% set diff = ((salary[1] - overall_avg) / overall_avg * 100) if overall_avg > 0 else 0 %}
+                                                {% if diff > 0 %}
+                                                    <span style="color: #28a745;">
+                                                        <i class="fas fa-arrow-up"></i> +{{ "%.1f"|format(diff) }}%
+                                                    </span>
+                                                {% elif diff < 0 %}
+                                                    <span style="color: #dc3545;">
+                                                        <i class="fas fa-arrow-down"></i> {{ "%.1f"|format(diff) }}%
+                                                    </span>
+                                                {% else %}
+                                                    <span style="color: #6c757d;">0%</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="chart-container">
+                            <h5><i class="fas fa-chart-bar"></i> Average Salary by Department</h5>
+                            <hr>
+                            <canvas id="salaryBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p>&copy; 2024 John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State. All rights reserved.</p>
+        <p class="mb-0"><small>HR Management System - Department Analytics Dashboard</small></p>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Staff Distribution Pie Chart
+        const staffCtx = document.getElementById('staffPieChart').getContext('2d');
+        const staffDepartments = [];
+        const staffCounts = [];
+        
+        {% for dept in staff_distribution %}
+            staffDepartments.push("{{ dept[0] }}");
+            staffCounts.push({{ dept[1] }});
+        {% endfor %}
+        
+        new Chart(staffCtx, {
+            type: 'pie',
+            data: {
+                labels: staffDepartments,
+                datasets: [{
+                    data: staffCounts,
+                    backgroundColor: [
+                        '#1e3c72', '#2a5298', '#3498db', '#5dade2', 
+                        '#85c1e9', '#aed6f1', '#d6eaf8', '#e8f0fe'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: {
+                                size: 11
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Salary Bar Chart
+        const salaryCtx = document.getElementById('salaryBarChart').getContext('2d');
+        const salaryDepartments = [];
+        const avgSalaries = [];
+        
+        {% for salary in salary_stats %}
+            salaryDepartments.push("{{ salary[0] }}");
+            avgSalaries.push({{ salary[1] }});
+        {% endfor %}
+        
+        new Chart(salaryCtx, {
+            type: 'bar',
+            data: {
+                labels: salaryDepartments,
+                datasets: [{
+                    label: 'Average Salary (₦)',
+                    data: avgSalaries,
+                    backgroundColor: '#1e3c72',
+                    borderColor: '#2a5298',
+                    borderWidth: 1,
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₦' + value.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return '₦' + context.raw.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

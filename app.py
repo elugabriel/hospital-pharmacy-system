@@ -257,7 +257,7 @@ def apply_stock_filter(stock, filter_type):
 # -------------------- ROUTES: LANDING & MODULES --------------------
 @app.route('/')
 def landing_page():
-    hospital_name = "Memorial Hospital Ovuru, Nsukka, Enugu State"
+    hospital_name = "John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State"
     modules = [
         "System Admin", "Patient Services", "Clinical Services",
         "Pharmacy", "Laboratory", "Radiology", "Billing and Revenue",
@@ -325,7 +325,7 @@ def drug_sales():
     return render_template(
         "drug_sales_dashboard.html",
         pharmacist_name=session.get('pharmacist_username'),
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State"
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State"
     )
 
 @app.route('/pharmacy/add-stock', methods=['GET', 'POST'])
@@ -455,7 +455,7 @@ def pharmacy_receipt():
     return render_template(
         "receipt.html",
         receipt=data,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         pharmacist_name=session.get('pharmacist_username')
     )
 
@@ -514,7 +514,7 @@ def reprint_receipt(receipt_no):
         "pharmacist": row[8], "date": row[9].strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    return render_template("receipt.html", receipt=receipt, hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State")
+    return render_template("receipt.html", receipt=receipt, hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State")
 
 @app.route("/pharmacy/confirm-payment", methods=["POST"])
 def confirm_payment():
@@ -829,7 +829,7 @@ def view_receipt(receipt_id):
         "receipt.html",
         receipt=receipt,
         items=items,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State"
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State"
     )
 
 # -------------------- ROUTES: BILLING MODULE --------------------
@@ -980,7 +980,7 @@ def view_payment_receipt(payment_id):
         return render_template(
             "billing_receipt.html",
             receipt=receipt,
-            hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+            hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
             user_name=session.get("billing_username")
         )
 

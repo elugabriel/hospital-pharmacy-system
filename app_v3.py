@@ -83,7 +83,7 @@ create_default_billing_user()
 # -------------------- LANDING PAGE / DASHBOARD --------------------
 @app.route('/')
 def landing_page():
-    hospital_name = "Memorial Hospital Ovuru, Nsukka, Enugu State"
+    hospital_name = "John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State"
     modules = [
         "System Admin",
         "Patient Services",
@@ -164,7 +164,7 @@ def drug_sales():
     return render_template(
         "drug_sales_dashboard.html",
         pharmacist_name=session.get('pharmacist_username'),
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State"
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State"
     )
 
 
@@ -324,7 +324,7 @@ def pharmacy_receipt():
     return render_template(
         "receipt.html",
         receipt=data,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State",
         pharmacist_name=session.get('pharmacist_username')
     )
 
@@ -396,7 +396,7 @@ def reprint_receipt(receipt_no):
     return render_template(
         "receipt.html",
         receipt=receipt,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State"
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State"
     )
 
 
@@ -665,7 +665,7 @@ def view_receipt(receipt_id):
         "receipt.html",
         receipt=receipt,
         items=items,
-        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State"
+        hospital_name="John-Theresa Spiritan Specialist Hospital, Uvuru, Nsukka, Enugu State"
     )
 
 
