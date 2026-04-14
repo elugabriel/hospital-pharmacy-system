@@ -2193,9 +2193,120 @@ def hr_login():
 def hr_reports():
     if "hr_user_id" not in session:
         return redirect(url_for("hr_login"))
-    return render_template("module_placeholder.html", 
-                         module_name="HR Reports",
-                         description="Generate HR analytics and reports")
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get staff list with complete data for staff report
+        cur.execute("""
+            SELECT 
+                s.id,
+                s.staff_id,
+                s.first_name,
+                s.last_name,
+                s.position,
+                s.employment_type,
+                s.email,
+                s.phone,
+                s.hire_date,
+                s.salary,
+                s.status,
+                s.emergency_contact,
+                s.address,
+                d.name as department_name,
+                d.id as department_id
+            FROM staff s
+            LEFT JOIN departments d ON s.department_id = d.id
+            WHERE s.status = 'Active'
+            ORDER BY s.first_name, s.last_name
+        """)
+        staff_list = cur.fetchall()
+        
+        # Get departments for filters
+        cur.execute("SELECT id, name FROM departments WHERE status = 'Active' ORDER BY name")
+        departments = cur.fetchall()
+        
+        # Get real attendance data for today
+        today = date.today()
+        cur.execute("""
+            SELECT 
+                COUNT(DISTINCT s.id) as total_staff,
+                COUNT(CASE WHEN a.status IN ('Present', 'Late') THEN 1 END) as present_count,
+                COUNT(CASE WHEN a.status = 'Absent' THEN 1 END) as absent_count,
+                COUNT(CASE WHEN a.status = 'Late' THEN 1 END) as late_count
+            FROM staff s
+            LEFT JOIN attendance a ON s.id = a.staff_id AND a.date = %s
+            WHERE s.status = 'Active'
+        """, (today,))
+        attendance_today = cur.fetchone()
+        
+        # Get real leave data for current year
+        current_year = today.year
+        cur.execute("""
+            SELECT 
+                l.id,
+                s.first_name || ' ' || s.last_name as staff_name,
+                d.name as department,
+                l.leave_type,
+                l.start_date,
+                l.end_date,
+                l.days_requested,
+                l.status,
+                l.approved_by,
+                hu.username as approved_by_name
+            FROM leaves l
+            JOIN staff s ON l.staff_id = s.id
+            LEFT JOIN departments d ON s.department_id = d.id
+            LEFT JOIN hr_users hu ON l.approved_by = hu.id
+            WHERE EXTRACT(YEAR FROM l.start_date) = %s
+            ORDER BY l.start_date DESC
+            LIMIT 100
+        """, (current_year,))
+        leave_data = cur.fetchall()
+        
+        # Get real payroll data (using staff salaries)
+        cur.execute("""
+            SELECT 
+                s.staff_id,
+                s.first_name || ' ' || s.last_name as staff_name,
+                d.name as department,
+                s.position,
+                s.salary as basic_salary,
+                COALESCE(SUM(CASE WHEN a.status IN ('Present', 'Late') THEN 1 ELSE 0 END), 0) as days_worked,
+                COUNT(DISTINCT a.date) as working_days
+            FROM staff s
+            LEFT JOIN departments d ON s.department_id = d.id
+            LEFT JOIN attendance a ON s.id = a.staff_id 
+                AND EXTRACT(YEAR_MONTH FROM a.date) = EXTRACT(YEAR_MONTH FROM CURRENT_DATE)
+            WHERE s.status = 'Active'
+            GROUP BY s.id, s.staff_id, s.first_name, s.last_name, d.name, s.position, s.salary
+            ORDER BY d.name, s.first_name
+        """)
+        payroll_data = cur.fetchall()
+        
+    except Exception as e:
+        app.logger.error(f"Error loading HR reports: {e}")
+        staff_list = []
+        departments = []
+        attendance_today = (0, 0, 0, 0)
+        leave_data = []
+        payroll_data = []
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template(
+        "hr_reports.html",
+        staff_list=staff_list,
+        departments=departments,
+        attendance_today=attendance_today,
+        leave_data=leave_data,
+        payroll_data=payroll_data,
+        hospital_name="Memorial Hospital Ovuru, Nsukka, Enugu State",
+        current_year=date.today().year
+    )
 
 # # -------------------- QUICK ACTION PLACEHOLDERS --------------------
 # @app.route("/hr/add-staff")

@@ -2,92 +2,465 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Revenue Report</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/revenue.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Revenue Report - Pharmacy Management System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 40px;
+            text-align: center;
+        }
+
+        .header h2 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        /* Form Section */
+        .form-section {
+            padding: 30px 40px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .form-group {
+            display: inline-block;
+            margin-right: 20px;
+            vertical-align: middle;
+        }
+
+        label {
+            display: inline-block;
+            margin-right: 10px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        select, input[type="date"] {
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: white;
+            cursor: pointer;
+        }
+
+        select:focus, input[type="date"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .dashboard-link {
+            display: inline-block;
+            background: #6c757d;
+            color: white;
+            text-decoration: none;
+            padding: 10px 25px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .dashboard-link:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(108, 117, 125, 0.3);
+        }
+
+        /* Stats Section */
+        .stats-section {
+            padding: 20px 40px;
+            background: #ffffff;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            display: inline-block;
+            width: auto;
+            min-width: 250px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .stats-card h3 {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .stats-card .amount {
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        /* Table Section */
+        .table-section {
+            padding: 30px 40px;
+            background: white;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #555;
+            font-size: 14px;
+        }
+
+        tbody tr {
+            transition: background-color 0.3s ease;
+        }
+
+        tbody tr:hover {
+            background-color: #f8f9fa;
+            transform: scale(1.01);
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 16px;
+        }
+
+        /* Input groups for monthly view */
+        .input-group {
+            display: inline-block;
+            margin-right: 15px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .form-section {
+                padding: 20px;
+            }
+            
+            .form-group, .input-group {
+                display: block;
+                margin-bottom: 15px;
+                width: 100%;
+            }
+            
+            select, input[type="date"], button, .dashboard-link {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+            
+            .stats-card {
+                width: 100%;
+                margin-bottom: 15px;
+            }
+            
+            .table-section {
+                padding: 20px;
+            }
+            
+            th, td {
+                padding: 10px;
+                font-size: 12px;
+            }
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #764ba2;
+        }
+
+        /* Animation for table rows */
+        tbody tr {
+            animation: fadeInUp 0.3s ease-out;
+            animation-fill-mode: both;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Stagger animation for rows */
+        tbody tr:nth-child(1) { animation-delay: 0.05s; }
+        tbody tr:nth-child(2) { animation-delay: 0.1s; }
+        tbody tr:nth-child(3) { animation-delay: 0.15s; }
+        tbody tr:nth-child(4) { animation-delay: 0.2s; }
+        tbody tr:nth-child(5) { animation-delay: 0.25s; }
+        tbody tr:nth-child(6) { animation-delay: 0.3s; }
+        tbody tr:nth-child(7) { animation-delay: 0.35s; }
+        tbody tr:nth-child(8) { animation-delay: 0.4s; }
+        tbody tr:nth-child(9) { animation-delay: 0.45s; }
+        tbody tr:nth-child(10) { animation-delay: 0.5s; }
+
+        /* Badge for status (optional) */
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+    </style>
 </head>
 <body>
-    <h2>Pharmacy Revenue Report</h2>
-
-    <form method="POST" action="{{ url_for('revenue_report') }}">
-        <!-- Select report period -->
-        <label for="period">Select period:</label>
-        <select name="period" id="period" onchange="toggleInputs()">
-            <option value="daily" {% if period == 'daily' %}selected{% endif %}>Daily</option>
-            <option value="weekly" {% if period == 'weekly' %}selected{% endif %}>Weekly</option>
-            <option value="monthly" {% if period == 'monthly' %}selected{% endif %}>Monthly</option>
-        </select>
-
-        <!-- Daily input -->
-        <div id="daily-input" style="display: {% if period == 'daily' or period == 'weekly' %}block{% else %}none{% endif %};">
-            <label>Date:</label>
-            <input type="date" name="day" value="{{ selected_day if selected_day else start_date }}">
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h2>💰 Pharmacy Revenue Report</h2>
+            <p>Track and analyze pharmacy sales revenue</p>
         </div>
 
-        <!-- Monthly inputs -->
-        <div id="monthly-input" style="display: {% if period == 'monthly' %}block{% else %}none{% endif %};">
-            <label>Month:</label>
-            <select name="month">
-                {% for num, name in months %}
-                    <option value="{{ num }}" {% if selected_month == num %}selected{% endif %}>{{ name }}</option>
-                {% endfor %}
-            </select>
+        <!-- Form Section -->
+        <div class="form-section">
+            <form method="POST" action="{{ url_for('revenue_report') }}">
+                <div class="form-group">
+                    <label for="period">📊 Select period:</label>
+                    <select name="period" id="period" onchange="toggleInputs()">
+                        <option value="daily" {% if period == 'daily' %}selected{% endif %}>📅 Daily</option>
+                        <option value="weekly" {% if period == 'weekly' %}selected{% endif %}>📆 Weekly</option>
+                        <option value="monthly" {% if period == 'monthly' %}selected{% endif %}>📈 Monthly</option>
+                    </select>
+                </div>
 
-            <label>Year:</label>
-            <select name="year">
-                {% for y in years %}
-                    <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
-                {% endfor %}
-            </select>
+                <!-- Daily/Weekly input -->
+                <div id="daily-input" style="display: {% if period == 'daily' or period == 'weekly' %}inline-block{% else %}none{% endif %};">
+                    <div class="input-group">
+                        <label>📅 Date:</label>
+                        <input type="date" name="day" value="{{ selected_day if selected_day else start_date }}">
+                    </div>
+                </div>
+
+                <!-- Monthly inputs -->
+                <div id="monthly-input" style="display: {% if period == 'monthly' %}inline-block{% else %}none{% endif %};">
+                    <div class="input-group">
+                        <label>📆 Month:</label>
+                        <select name="month">
+                            {% for num, name in months %}
+                                <option value="{{ num }}" {% if selected_month == num %}selected{% endif %}>{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label>📅 Year:</label>
+                        <select name="year">
+                            {% for y in years %}
+                                <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit">🔍 Get Revenue</button>
+                <a href="{{ url_for('pharmacy_dashboard') }}" class="dashboard-link">
+                    ← Dashboard
+                </a>
+            </form>
         </div>
 
-        <button type="submit">Get Revenue</button>
-        <a href="{{ url_for('pharmacy_dashboard') }}"
-               class="btn btn-outline-secondary">
-                ← Dashboard
-            </a>
-    </form>
+        <!-- Stats Section -->
+        <div class="stats-section">
+            <div class="stats-card">
+                <h3>Total Revenue</h3>
+                <div class="amount">₦{{ "{:,.2f}".format(total_revenue) }}</div>
+                <p style="font-size: 12px; margin-top: 10px; opacity: 0.8;">
+                    {% if period == 'daily' %}
+                        for selected day
+                    {% elif period == 'weekly' %}
+                        for selected week
+                    {% else %}
+                        for selected month
+                    {% endif %}
+                </p>
+            </div>
+        </div>
 
-    <!-- Display sales table -->
-    <table border="1" cellpadding="5">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Receipt No</th>
-                <th>Patient Name</th>
-                <th>Patient ID</th>
-                <th>Amount (₦)</th>
-                <th>Date</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% if sales %}
-                {% for sale in sales %}
-                <tr>
-                    <td>{{ loop.index }}</td>
-                    <td>{{ sale[0] }}</td>
-                    <td>{{ sale[1] }}</td>
-                    <td>{{ sale[2] }}</td>
-                    <td>₦{{ "%.2f"|format(sale[3]) }}</td>
-                    <td>{{ sale[4].strftime("%Y-%m-%d %H:%M:%S") }}</td>
-                </tr>
-                {% endfor %}
-            {% else %}
-                <tr>
-                    <td colspan="6">No records found.</td>
-                </tr>
-            {% endif %}
-        </tbody>
-    </table>
-
-    <!-- Display total revenue -->
-    <h3>Total Revenue: ₦{{ "%.2f"|format(total_revenue) }}</h3>
+        <!-- Table Section -->
+        <div class="table-section">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Receipt No</th>
+                        <th>Patient Name</th>
+                        <th>Patient ID</th>
+                        <th>Amount (₦)</th>
+                        <th>Date & Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if sales %}
+                        {% for sale in sales %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td><strong>#{{ sale[0] }}</strong></td>
+                            <td>{{ sale[1] }}</td>
+                            <td>{{ sale[2] if sale[2] != 'N/A' else '<span style="color: #999;">N/A</span>'|safe }}</td>
+                            <td><strong>₦{{ "{:,.2f}".format(sale[3]) }}</strong></td>
+                            <td>
+                                {% if sale[4] %}
+                                    {% if sale[4] is string %}
+                                        {{ sale[4] }}
+                                    {% else %}
+                                        {{ sale[4].strftime("%Y-%m-%d %H:%M:%S") }}
+                                    {% endif %}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="no-data">
+                                📭 No records found for the selected period
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 
     <script>
-    function toggleInputs() {
-        const period = document.getElementById('period').value;
-        document.getElementById('daily-input').style.display = (period === 'daily' || period === 'weekly') ? 'block' : 'none';
-        document.getElementById('monthly-input').style.display = (period === 'monthly') ? 'block' : 'none';
-    }
+        function toggleInputs() {
+            const period = document.getElementById('period').value;
+            const dailyInput = document.getElementById('daily-input');
+            const monthlyInput = document.getElementById('monthly-input');
+            
+            if (period === 'daily' || period === 'weekly') {
+                dailyInput.style.display = 'inline-block';
+                monthlyInput.style.display = 'none';
+            } else if (period === 'monthly') {
+                dailyInput.style.display = 'none';
+                monthlyInput.style.display = 'inline-block';
+            }
+        }
+        
+        // Add animation to stats card on load
+        window.addEventListener('DOMContentLoaded', function() {
+            const statsCard = document.querySelector('.stats-card');
+            if (statsCard) {
+                statsCard.style.animation = 'slideIn 0.5s ease-out';
+            }
+        });
     </script>
 </body>
 </html>

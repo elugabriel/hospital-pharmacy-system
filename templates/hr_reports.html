@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Reports - Memorial Hospital</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+        }
+
+        /* Top Navigation Bar */
+        .top-navbar {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 0 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .navbar-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .navbar-brand {
+            padding: 15px 0;
+        }
+
+        .navbar-brand h2 {
+            margin: 0;
+            font-size: 1.3rem;
+        }
+
+        .navbar-brand p {
+            margin: 0;
+            font-size: 0.7rem;
+            opacity: 0.9;
+        }
+
+        .nav-menu {
+            display: flex;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .nav-menu li {
+            margin: 0;
+        }
+
+        .nav-menu li a {
+            display: flex;
+            align-items: center;
+            padding: 18px 20px;
+            color: white;
+            text-decoration: none;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .nav-menu li a:hover {
+            background: rgba(255,255,255,0.1);
+            border-bottom-color: #ffc107;
+        }
+
+        .nav-menu li a.active {
+            background: rgba(255,255,255,0.15);
+            border-bottom-color: #ffc107;
+        }
+
+        .nav-menu li a i {
+            margin-right: 8px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-name {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+            color: white;
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .main-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .page-header {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .page-header h3 {
+            margin: 0;
+            color: #1e3c72;
+        }
+
+        .report-cards {
+            margin-bottom: 30px;
+        }
+
+        .report-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            height: 100%;
+        }
+
+        .report-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .report-card.active {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+        }
+
+        .report-icon {
+            font-size: 2.5rem;
+            color: #1e3c72;
+            margin-bottom: 10px;
+        }
+
+        .report-card.active .report-icon {
+            color: white;
+        }
+
+        .report-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .report-container {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: none;
+        }
+
+        .report-container.active {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .report-header {
+            border-bottom: 2px solid #1e3c72;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .report-header h4 {
+            color: #1e3c72;
+            margin: 0;
+        }
+
+        .filter-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            height: 100%;
+            border-left: 4px solid #1e3c72;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #1e3c72;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .table thead th {
+            background: #1e3c72;
+            color: white;
+            border: none;
+            padding: 12px;
+        }
+
+        .btn-export {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 5px;
+            margin-right: 10px;
+            margin-bottom: 15px;
+        }
+
+        .badge-active {
+            background: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+        }
+
+        .badge-pending {
+            background: #ffc107;
+            color: #333;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+        }
+
+        .footer {
+            background: white;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #dee2e6;
+            margin-top: 30px;
+        }
+
+        @media (max-width: 992px) {
+            .nav-menu {
+                position: fixed;
+                left: -100%;
+                top: 70px;
+                flex-direction: column;
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                width: 100%;
+                text-align: center;
+                transition: 0.3s;
+                z-index: 999;
+            }
+
+            .nav-menu.active {
+                left: 0;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <div class="top-navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <h2><i class="fas fa-chart-bar"></i> HR Reports Dashboard</h2>
+                <p>Memorial Hospital Ovuru, Nsukka, Enugu State</p>
+            </div>
+            
+            <div class="mobile-menu-btn" id="mobileMenuBtn">
+                <i class="fas fa-bars"></i>
+            </div>
+            
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="{{ url_for('hr_dashboard') }}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                <li><a href="{{ url_for('staff_management') }}"><i class="fas fa-users"></i> Staff</a></li>
+                <li><a href="{{ url_for('departments') }}"><i class="fas fa-building"></i> Departments</a></li>
+                <li><a href="{{ url_for('attendance_record') }}"><i class="fas fa-clock"></i> Attendance</a></li>
+                <li><a href="{{ url_for('leave_management') }}"><i class="fas fa-calendar-alt"></i> Leave</a></li>
+                <li><a href="{{ url_for('scheduling') }}"><i class="fas fa-calendar-week"></i> Scheduling</a></li>
+                <li><a href="{{ url_for('department_analytics') }}"><i class="fas fa-chart-line"></i> Analytics</a></li>
+                <li><a href="{{ url_for('hr_reports') }}" class="active"><i class="fas fa-file-alt"></i> Reports</a></li>
+            </ul>
+            
+            <div class="user-info">
+                <span class="user-name"><i class="fas fa-user-circle"></i> HR Administrator</span>
+                <a href="{{ url_for('hr_logout') }}" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="page-header">
+            <h3><i class="fas fa-chart-line"></i> HR Reports & Analytics</h3>
+            <p>View real-time data from your database</p>
+        </div>
+
+        <!-- Report Selection Cards -->
+        <div class="row report-cards">
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="report-card" onclick="showReport('staff')" id="staffCard">
+                    <div class="report-icon"><i class="fas fa-users"></i></div>
+                    <div class="report-title">Staff Report</div>
+                    <div class="report-label">{{ staff_list|length }} Active Staff</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="report-card" onclick="showReport('attendance')" id="attendanceCard">
+                    <div class="report-icon"><i class="fas fa-clock"></i></div>
+                    <div class="report-title">Attendance Report</div>
+                    <div class="report-label">Today's Attendance</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="report-card" onclick="showReport('leave')" id="leaveCard">
+                    <div class="report-icon"><i class="fas fa-calendar-alt"></i></div>
+                    <div class="report-title">Leave Report</div>
+                    <div class="report-label">{{ leave_data|length }} Requests</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="report-card" onclick="showReport('payroll')" id="payrollCard">
+                    <div class="report-icon"><i class="fas fa-money-bill-wave"></i></div>
+                    <div class="report-title">Payroll Report</div>
+                    <div class="report-label">{{ payroll_data|length }} Employees</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STAFF REPORT - Shows REAL data from database -->
+        <div id="staffReport" class="report-container active">
+            <div class="report-header">
+                <h4><i class="fas fa-users"></i> Staff Directory</h4>
+            </div>
+            
+            <div class="filter-section">
+                <div class="row">
+                    <div class="col-md-4 mb-2">
+                        <label>Department</label>
+                        <select id="staffDeptFilter" class="form-select">
+                            <option value="">All Departments</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept[1] }}">{{ dept[1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label>Employment Type</label>
+                        <select id="staffTypeFilter" class="form-select">
+                            <option value="">All Types</option>
+                            <option value="Full-Time">Full-Time</option>
+                            <option value="Part-Time">Part-Time</option>
+                            <option value="Contract">Contract</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label>&nbsp;</label>
+                        <button class="btn btn-primary w-100" onclick="filterStaffReport()">Apply Filters</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="staffTable" class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Staff ID</th>
+                            <th>Name</th>
+                            <th>Department</th>
+                            <th>Position</th>
+                            <th>Employment Type</th>
+                            <th>Hire Date</th>
+                            <th>Salary (₦)</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for staff in staff_list %}
+                        <tr>
+                            <td>{{ staff[1] }}</td>
+                            <td>{{ staff[2] }} {{ staff[3] }}</td>
+                            <td>{{ staff[13] or 'N/A' }}</td>
+                            <td>{{ staff[4] }}</td>
+                            <td>{{ staff[5] or 'N/A' }}</td>
+                            <td>{{ staff[8] }}</td>
+                            <td>{{ "{:,.0f}".format(staff[9]|float) if staff[9] else '0' }}</td>
+                            <td><span class="badge-active">{{ staff[10] }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ATTENDANCE REPORT - Shows REAL data -->
+        <div id="attendanceReport" class="report-container">
+            <div class="report-header">
+                <h4><i class="fas fa-clock"></i> Attendance Summary</h4>
+            </div>
+
+            <!-- Real attendance statistics from database -->
+            <div class="row mb-4">
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="stat-card">
+                        <div class="stat-value">{{ attendance_today[0] or 0 }}</div>
+                        <div class="stat-label">Total Staff</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="stat-card">
+                        <div class="stat-value">{{ attendance_today[1] or 0 }}</div>
+                        <div class="stat-label">Present Today</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="stat-card">
+                        <div class="stat-value">{{ attendance_today[2] or 0 }}</div>
+                        <div class="stat-label">Absent Today</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="stat-card">
+                        <div class="stat-value">{{ attendance_today[3] or 0 }}</div>
+                        <div class="stat-label">Late Today</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> For detailed attendance history, please visit the <a href="{{ url_for('attendance_record') }}">Attendance Record</a> page.
+            </div>
+        </div>
+
+        <!-- LEAVE REPORT - Shows REAL data from database -->
+        <div id="leaveReport" class="report-container">
+            <div class="report-header">
+                <h4><i class="fas fa-calendar-alt"></i> Leave Requests ({{ current_year }})</h4>
+            </div>
+
+            <div class="table-container">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Staff Name</th>
+                            <th>Department</th>
+                            <th>Leave Type</th>
+                            <th>Start Date</th>
+                            <th>End Date</th>
+                            <th>Days</th>
+                            <th>Status</th>
+                            <th>Approved By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for leave in leave_data %}
+                        <tr>
+                            <td>{{ leave[1] }}</td>
+                            <td>{{ leave[2] or 'N/A' }}</td>
+                            <td>{{ leave[3] }}</td>
+                            <td>{{ leave[4] }}</td>
+                            <td>{{ leave[5] }}</td>
+                            <td>{{ leave[6] }}</td>
+                            <td>
+                                {% if leave[7] == 'Approved' %}
+                                    <span class="badge-active">Approved</span>
+                                {% elif leave[7] == 'Pending' %}
+                                    <span class="badge-pending">Pending</span>
+                                {% else %}
+                                    <span class="badge" style="background: #dc3545; color: white; padding: 5px 10px; border-radius: 20px;">{{ leave[7] }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ leave[8] or 'Pending' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center">No leave records found for {{ current_year }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- PAYROLL REPORT - Shows REAL salaries from database -->
+        <div id="payrollReport" class="report-container">
+            <div class="report-header">
+                <h4><i class="fas fa-money-bill-wave"></i> Payroll Summary</h4>
+            </div>
+
+            <!-- Real payroll calculations from database -->
+            <div class="row mb-4">
+                <div class="col-md-4 col-sm-6 mb-3">
+                    <div class="stat-card">
+                        <div class="stat-value">{{ payroll_data|length }}</div>
+                        <div class="stat-label">Total Employees</div>
+                    </div>
+                </div>
+                <div class="col-md-4 col-sm-6 mb-3">
+                    <div class="stat-card">
+                        <div class="stat-value">
+                            {% set total_salary = 0 %}
+                            {% for emp in payroll_data %}
+                                {% set total_salary = total_salary + (emp[4]|float or 0) %}
+                            {% endfor %}
+                            ₦{{ "{:,.0f}".format(total_salary) }}
+                        </div>
+                        <div class="stat-label">Total Monthly Salary</div>
+                    </div>
+                </div>
+                <div class="col-md-4 col-sm-6 mb-3">
+                    <div class="stat-card">
+                        <div class="stat-value">
+                            {% set avg_salary = 0 %}
+                            {% if payroll_data|length > 0 %}
+                                {% set avg_salary = total_salary / payroll_data|length %}
+                            {% endif %}
+                            ₦{{ "{:,.0f}".format(avg_salary) }}
+                        </div>
+                        <div class="stat-label">Average Salary</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Staff ID</th>
+                            <th>Staff Name</th>
+                            <th>Department</th>
+                            <th>Position</th>
+                            <th>Basic Salary (₦)</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for emp in payroll_data %}
+                        <tr>
+                            <td>{{ emp[0] }}</td>
+                            <td>{{ emp[1] }}</td>
+                            <td>{{ emp[2] or 'N/A' }}</td>
+                            <td>{{ emp[3] }}</td>
+                            <td>₦{{ "{:,.0f}".format(emp[4]|float) if emp[4] else '0' }}</td>
+                            <td><span class="badge-active">Active</span></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center">No active staff found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>&copy; {{ current_year }} Memorial Hospital Ovuru, Nsukka, Enugu State. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+
+    <script>
+        document.getElementById('mobileMenuBtn').addEventListener('click', function() {
+            document.getElementById('navMenu').classList.toggle('active');
+        });
+
+        function showReport(reportType) {
+            document.querySelectorAll('.report-container').forEach(container => {
+                container.classList.remove('active');
+            });
+            document.querySelectorAll('.report-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            
+            document.getElementById(reportType + 'Report').classList.add('active');
+            document.getElementById(reportType + 'Card').classList.add('active');
+        }
+
+        function filterStaffReport() {
+            const dept = document.getElementById('staffDeptFilter').value;
+            const type = document.getElementById('staffTypeFilter').value;
+            const table = document.getElementById('staffTable');
+            const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+            
+            for (let row of rows) {
+                let show = true;
+                if (dept && row.cells[2].innerText !== dept) show = false;
+                if (type && row.cells[4].innerText !== type) show = false;
+                row.style.display = show ? '' : 'none';
+            }
+        }
+
+        $(document).ready(function() {
+            $('#staffTable').DataTable({
+                pageLength: 25,
+                language: { search: "Search:" }
+            });
+        });
+    </script>
+</body>
+</html>

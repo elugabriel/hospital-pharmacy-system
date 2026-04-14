@@ -573,7 +573,17 @@
                         <tbody>
                             {% for transaction in recent_transactions %}
                                 <tr>
-                                    <td>{{ transaction.created_at.strftime('%H:%M') }}</td>
+                                    <td>
+                                        {% if transaction.created_at %}
+                                            {% if transaction.created_at is string %}
+                                                {{ transaction.created_at[11:16] if transaction.created_at|length > 11 else transaction.created_at }}
+                                            {% else %}
+                                                {{ transaction.created_at.strftime('%H:%M') }}
+                                            {% endif %}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
                                     <td>#{{ transaction.id }}</td>
                                     <td>{{ transaction.patient_name }}</td>
                                     <td>{{ transaction.service_type }}</td>
@@ -606,7 +616,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('billing_receipt', payment_id=transaction.id) }}" 
+                                        <a href="{{ url_for('view_payment_receipt', payment_id=transaction.id) }}"
                                            class="action-btn" 
                                            style="background: #3498db; color: white; padding: 5px 10px; border-radius: 4px; text-decoration: none;">
                                             <i class="fa-solid fa-eye"></i> View
