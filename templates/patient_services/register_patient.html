@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register New Patient - JTSSH Hospital</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { background: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .navbar-brand, .nav-link { color: white !important; }
+        .card { border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border: none; margin-bottom: 20px; }
+        .card-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 15px 15px 0 0; }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; }
+        .btn-primary:hover { background: linear-gradient(135deg, #5a67d8 0%, #6b46a0 100%); }
+        .form-label { font-weight: 600; }
+        .required:after { content: " *"; color: red; }
+        .card-number-preview {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: white;
+        }
+        .card-number-preview .label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            opacity: 0.9;
+        }
+        .card-number-preview .number {
+            font-size: 24px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 2px;
+        }
+        .section-title {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin: 20px 0 15px 0;
+            border-left: 4px solid #667eea;
+            font-weight: bold;
+            color: #333;
+        }
+        .section-title i {
+            color: #667eea;
+            margin-right: 8px;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .optional-badge {
+            font-size: 11px;
+            background: #e9ecef;
+            color: #6c757d;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            font-weight: normal;
+        }
+        /* Loading spinner animation */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #fff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="#"><i class="bi bi-person-plus"></i> New Patient Registration</a>
+            <div class="ms-auto">
+                <a href="{{ url_for('patient_services_dashboard') }}" class="btn btn-light btn-sm me-2">
+                    <i class="bi bi-speedometer2"></i> Dashboard
+                </a>
+                <a href="{{ url_for('patient_services_logout') }}" class="btn btn-danger btn-sm">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Card Number Preview -->
+        <div class="card-number-preview">
+            <div class="label"><i class="bi bi-credit-card"></i> HOSPITAL CARD NUMBER (AUTO-GENERATED)</div>
+            <div class="number" id="cardNumberPreview">JTSSH-••••••</div>
+            <small>Will be assigned automatically upon registration</small>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-person-badge"></i> Patient Registration Form</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="registrationForm" onsubmit="return validateForm()">
+                    <!-- PERSONAL INFORMATION -->
+                    <div class="section-title">
+                        <i class="bi bi-person-circle"></i> Personal Information
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">First Name</label>
+                            <input type="text" name="first_name" class="form-control" required 
+                                   placeholder="Enter first name">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Last Name</label>
+                            <input type="text" name="last_name" class="form-control" required
+                                   placeholder="Enter last name">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label required">Date of Birth</label>
+                            <input type="date" name="date_of_birth" class="form-control" required>
+                            <small class="text-muted">Age will be calculated automatically</small>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label required">Gender</label>
+                            <select name="gender" class="form-select" required>
+                                <option value="">Select Gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Genotype <span class="optional-badge">Optional</span></label>
+                            <select name="genotype" class="form-select">
+                                <option value="">Select Genotype</option>
+                                <option value="AA">AA</option>
+                                <option value="AS">AS</option>
+                                <option value="SS">SS</option>
+                                <option value="AC">AC</option>
+                                <option value="SC">SC</option>
+                                <option value="Unknown">Unknown / Not Sure</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Blood Group <span class="optional-badge">Optional</span></label>
+                            <select name="blood_group" class="form-select">
+                                <option value="">Select Blood Group</option>
+                                <option value="A+">A+</option>
+                                <option value="A-">A-</option>
+                                <option value="B+">B+</option>
+                                <option value="B-">B-</option>
+                                <option value="O+">O+</option>
+                                <option value="O-">O-</option>
+                                <option value="AB+">AB+</option>
+                                <option value="AB-">AB-</option>
+                                <option value="Unknown">Unknown / Not Sure</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Religion <span class="optional-badge">Optional</span></label>
+                            <select name="religion" class="form-select">
+                                <option value="">Select Religion</option>
+                                <option value="Christianity">Christianity</option>
+                                <option value="Islam">Islam</option>
+                                <option value="Traditional">Traditional</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Marital Status <span class="optional-badge">Optional</span></label>
+                            <select name="marital_status" class="form-select">
+                                <option value="">Select Status</option>
+                                <option value="Single">Single</option>
+                                <option value="Married">Married</option>
+                                <option value="Divorced">Divorced</option>
+                                <option value="Widowed">Widowed</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- CONTACT INFORMATION -->
+                    <div class="section-title">
+                        <i class="bi bi-envelope"></i> Contact Information
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phone Number <span class="optional-badge">Optional</span></label>
+                            <input type="tel" name="phone" class="form-control" 
+                                   placeholder="e.g., 08012345678">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Email Address <span class="optional-badge">Optional</span></label>
+                            <input type="text" name="email" class="form-control" 
+                                   placeholder="patient@example.com">
+                            <small class="text-muted">Email is optional - you can leave it blank</small>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Residential Address <span class="optional-badge">Optional</span></label>
+                        <textarea name="address" class="form-control" rows="2" 
+                                  placeholder="Enter full residential address"></textarea>
+                    </div>
+
+                    <!-- EMERGENCY CONTACT -->
+                    <div class="section-title">
+                        <i class="bi bi-shield-plus"></i> Emergency Contact <span class="optional-badge">Optional but Recommended</span>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Emergency Contact Name</label>
+                            <input type="text" name="emergency_contact_name" class="form-control"
+                                   placeholder="Full name of emergency contact">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Emergency Contact Phone</label>
+                            <input type="tel" name="emergency_contact_phone" class="form-control"
+                                   placeholder="Emergency phone number">
+                        </div>
+                    </div>
+
+                    <!-- NEXT OF KIN -->
+                    <div class="section-title">
+                        <i class="bi bi-people"></i> Next of Kin <span class="optional-badge">Optional</span>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Next of Kin Name</label>
+                            <input type="text" name="next_of_kin" class="form-control"
+                                   placeholder="Full name of next of kin">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Next of Kin Phone</label>
+                            <input type="tel" name="next_of_kin_phone" class="form-control"
+                                   placeholder="Next of kin phone number">
+                        </div>
+                    </div>
+
+                    <!-- EMPLOYMENT & OTHER -->
+                    <div class="section-title">
+                        <i class="bi bi-briefcase"></i> Employment & Other Details
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Occupation <span class="optional-badge">Optional</span></label>
+                            <input type="text" name="occupation" class="form-control"
+                                   placeholder="e.g., Doctor, Engineer, Teacher">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Nationality</label>
+                            <input type="text" name="nationality" class="form-control" 
+                                   value="Nigerian">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Additional Notes / Medical History <span class="optional-badge">Optional</span></label>
+                        <textarea name="notes" class="form-control" rows="3" 
+                                  placeholder="Any allergies, chronic conditions, or important notes..."></textarea>
+                    </div>
+
+                    <!-- FORM ACTIONS -->
+                    <div class="text-end mt-4">
+                        <a href="{{ url_for('patient_services_dashboard') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </a>
+                        <button type="reset" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-repeat"></i> Reset
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            <i class="bi bi-check-circle"></i> Register Patient
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Age calculation from date of birth
+        const dobInput = document.querySelector('input[name="date_of_birth"]');
+        
+        function calculateAge() {
+            if (dobInput.value) {
+                const birthDate = new Date(dobInput.value);
+                const today = new Date();
+                let age = today.getFullYear() - birthDate.getFullYear();
+                const monthDiff = today.getMonth() - birthDate.getMonth();
+                
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                    age--;
+                }
+                
+                if (age >= 0) {
+                    // Create or update age display
+                    let ageDisplay = document.getElementById('ageDisplay');
+                    if (!ageDisplay) {
+                        ageDisplay = document.createElement('small');
+                        ageDisplay.id = 'ageDisplay';
+                        ageDisplay.className = 'text-muted mt-1 d-block';
+                        dobInput.parentNode.appendChild(ageDisplay);
+                    }
+                    ageDisplay.innerHTML = `📅 Calculated Age: ${age} years`;
+                }
+            }
+        }
+        
+        dobInput.addEventListener('change', calculateAge);
+        dobInput.addEventListener('input', calculateAge);
+        
+        // Run age calculation on page load if date is pre-filled
+        if (dobInput.value) {
+            calculateAge();
+        }
+        
+        // Form validation
+        function validateForm() {
+            const phone = document.querySelector('input[name="phone"]').value;
+            const email = document.querySelector('input[name="email"]').value;
+            const firstName = document.querySelector('input[name="first_name"]').value;
+            const lastName = document.querySelector('input[name="last_name"]').value;
+            const dob = document.querySelector('input[name="date_of_birth"]').value;
+            const gender = document.querySelector('select[name="gender"]').value;
+            
+            // Validate required fields
+            if (!firstName || !lastName || !dob || !gender) {
+                alert('Please fill in all required fields (marked with *)');
+                return false;
+            }
+            
+            // Validate date of birth (cannot be future date)
+            if (dob) {
+                const birthDate = new Date(dob);
+                const today = new Date();
+                if (birthDate > today) {
+                    alert('Date of birth cannot be in the future');
+                    return false;
+                }
+            }
+            
+            // Validate phone number (Nigerian format) - only if provided
+            if (phone && phone.trim() !== "") {
+                const phoneRegex = /^[0-9]{10,11}$/;
+                if (!phoneRegex.test(phone) && !phone.startsWith('+234')) {
+                    alert('Please enter a valid phone number (10-11 digits) or leave it blank');
+                    return false;
+                }
+            }
+            
+            // Validate email format if provided (optional - only validate if not empty)
+            if (email && email.trim() !== "") {
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    alert('Please enter a valid email address or leave it blank');
+                    return false;
+                }
+            }
+            
+            // Validate names (no numbers)
+            if (firstName && /\d/.test(firstName)) {
+                alert('First name should not contain numbers');
+                return false;
+            }
+            
+            if (lastName && /\d/.test(lastName)) {
+                alert('Last name should not contain numbers');
+                return false;
+            }
+            
+            // Show loading state
+            const submitBtn = document.getElementById('submitBtn');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading-spinner"></span> Registering Patient...';
+            
+            // Store original text to restore if needed (though form will submit)
+            submitBtn.setAttribute('data-original-text', originalText);
+            
+            return true;
+        }
+        
+        // Auto-format phone number as user types
+        const phoneInput = document.querySelector('input[name="phone"]');
+        if (phoneInput) {
+            phoneInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value.length > 11) value = value.slice(0, 11);
+                e.target.value = value;
+            });
+        }
+        
+        // Auto-format next of kin phone number
+        const nextOfKinPhoneInput = document.querySelector('input[name="next_of_kin_phone"]');
+        if (nextOfKinPhoneInput) {
+            nextOfKinPhoneInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value.length > 11) value = value.slice(0, 11);
+                e.target.value = value;
+            });
+        }
+        
+        // Auto-format emergency contact phone number
+        const emergencyPhoneInput = document.querySelector('input[name="emergency_contact_phone"]');
+        if (emergencyPhoneInput) {
+            emergencyPhoneInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value.length > 11) value = value.slice(0, 11);
+                e.target.value = value;
+            });
+        }
+        
+        // Generate a preview of card number with realistic sequential number
+        async function generatePreview() {
+            try {
+                // Try to fetch the next card number for preview
+                const response = await fetch('/api/next-card-number');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('cardNumberPreview').innerHTML = data.card_number;
+                } else {
+                    // Fallback to timestamp-based preview
+                    const timestamp = Date.now().toString().slice(-6);
+                    document.getElementById('cardNumberPreview').innerHTML = `JTSSH-${timestamp}`;
+                }
+            } catch (error) {
+                // Fallback to timestamp-based preview
+                const timestamp = Date.now().toString().slice(-6);
+                document.getElementById('cardNumberPreview').innerHTML = `JTSSH-${timestamp}`;
+            }
+        }
+        generatePreview();
+        
+        // Prevent form resubmission on page refresh
+        if (window.history.replaceState) {
+            window.history.replaceState(null, null, window.location.href);
+        }
+        
+        // Show flash messages as toast notifications
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('error')) {
+            setTimeout(() => {
+                alert(urlParams.get('error'));
+            }, 100);
+        }
+    </script>
+</body>
+</html>

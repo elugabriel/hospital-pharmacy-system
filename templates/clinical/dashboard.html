@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinical Dashboard | Doctor Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background: #f0f2f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .navbar-brand, .nav-link { color: white !important; }
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #1e3c72;
+        }
+        .stat-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+            color: #1e3c72;
+        }
+        .quick-action {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            text-decoration: none;
+            color: #333;
+            transition: all 0.3s;
+            display: block;
+            margin-bottom: 15px;
+            border: 1px solid #e0e0e0;
+        }
+        .quick-action:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            color: #1e3c72;
+            border-color: #1e3c72;
+        }
+        .queue-table {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .badge-emergency { background: #dc3545; }
+        .badge-high { background: #ffc107; color: #000; }
+        .badge-normal { background: #28a745; }
+        .pending-task {
+            background: white;
+            border-radius: 10px;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #1e3c72;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            border: none;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
+        }
+        .welcome-bar {
+            background: white;
+            border-radius: 10px;
+            padding: 10px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('clinical_dashboard') }}"><i class="bi bi-heart-pulse"></i> Clinical Services</a>
+            <div class="ms-auto">
+                <span class="text-white me-3">Welcome, {{ session.get('clinical_username', 'Doctor') }}</span>
+                <a href="{{ url_for('clinical_logout') }}" class="btn btn-danger btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Welcome Bar - matching other dashboards -->
+        <div class="welcome-bar d-flex justify-content-between align-items-center">
+            <div>
+                <i class="bi bi-person-circle fs-4 me-2"></i>
+                <span>Welcome, <strong>{{ session.get('clinical_username', 'Doctor') }}</strong></span>
+            </div>
+            <div>
+                <i class="bi bi-calendar3 me-2"></i>
+                <span>{{ today_date }}</span>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="stat-card" onclick="location.href='{{ url_for('clinical_appointments') }}'">
+                    <div class="stat-icon"><i class="bi bi-calendar-check"></i></div>
+                    <div class="stat-number">{{ appointments_today }}</div>
+                    <div class="text-muted">Today's Appointments</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card" onclick="location.href='{{ url_for('clinical_active_consultations') }}'">
+                    <div class="stat-icon"><i class="bi bi-activity"></i></div>
+                    <div class="stat-number">{{ active_consultations }}</div>
+                    <div class="text-muted">In Progress</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card" onclick="location.href='{{ url_for('clinical_consultation_history') }}'">
+                    <div class="stat-icon"><i class="bi bi-check2-circle"></i></div>
+                    <div class="stat-number">{{ completed_today }}</div>
+                    <div class="text-muted">Completed Today</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card" onclick="location.href='{{ url_for('clinical_queue') }}'">
+                    <div class="stat-icon"><i class="bi bi-clock-history"></i></div>
+                    <div class="stat-number">{{ waiting_patients }}</div>
+                    <div class="text-muted">Waiting in Queue</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions and Pending Tasks -->
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <h5><i class="bi bi-lightning-charge"></i> Quick Actions</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <a href="{{ url_for('clinical_patient_search') }}" class="quick-action">
+                            <i class="bi bi-stethoscope fs-1"></i>
+                            <div>Start Consultation</div>
+                        </a>
+                    </div>
+                    <div class="col-md-6">
+                        <a href="{{ url_for('clinical_queue') }}" class="quick-action">
+                            <i class="bi bi-people fs-1"></i>
+                            <div>My Queue</div>
+                        </a>
+                    </div>
+                    <div class="col-md-6">
+                        <a href="{{ url_for('clinical_write_prescription') }}" class="quick-action">
+                            <i class="bi bi-capsule fs-1"></i>
+                            <div>Write Prescription</div>
+                        </a>
+                    </div>
+                    <div class="col-md-6">
+                        <a href="{{ url_for('clinical_order_lab') }}" class="quick-action">
+                            <i class="bi bi-droplet fs-1"></i>
+                            <div>Order Lab Test</div>
+                        </a>
+                    </div>
+                    <div class="col-md-6">
+                        <a href="{{ url_for('clinical_order_imaging') }}" class="quick-action">
+                            <i class="bi bi-camera fs-1"></i>
+                            <div>Order Imaging</div>
+                        </a>
+                    </div>
+                    <div class="col-md-6">
+                        <a href="{{ url_for('clinical_notes') }}" class="quick-action">
+                            <i class="bi bi-pencil-square fs-1"></i>
+                            <div>Clinical Notes</div>
+                        </a>
+                    </div>
+
+                    <div class="col-md-6">
+                        <a href="{{ url_for('clinical_prescriptions') }}" class="quick-action">
+                            <i class="bi bi-clock-history fs-1"></i>
+                            <div>Prescription History</div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <h5><i class="bi bi-tasks"></i> Pending Tasks</h5>
+                <div class="pending-task" onclick="location.href='{{ url_for('clinical_queue') }}'">
+                    <i class="bi bi-people"></i> Patients waiting: <strong>{{ waiting_patients }}</strong>
+                </div>
+                <div class="pending-task" onclick="location.href='{{ url_for('clinical_lab_results') }}'">
+                    <i class="bi bi-flask"></i> Lab results pending review: <strong>{{ pending_lab_results }}</strong>
+                </div>
+                <div class="pending-task" onclick="location.href='{{ url_for('clinical_imaging_reports') }}'">
+                    <i class="bi bi-camera"></i> Imaging reports ready: <strong>{{ pending_imaging }}</strong>
+                </div>
+                <div class="pending-task" onclick="location.href='{{ url_for('clinical_followups') }}'">
+                    <i class="bi bi-calendar"></i> Patients for follow-up: <strong>{{ followup_patients }}</strong>
+                </div>
+                <div class="pending-task" onclick="location.href='{{ url_for('clinical_referrals_inbox') }}'">
+                    <i class="bi bi-send"></i> Referrals to process: <strong>{{ pending_referrals }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Patient Queue -->
+        <div class="queue-table">
+            <h5><i class="bi bi-clock"></i> Current Patient Queue</h5>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Token</th>
+                            <th>Patient Name</th>
+                            <th>Wait Time</th>
+                            <th>Priority</th>
+                            <th>Type</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for patient in queue %}
+                        <tr>
+                            <td><strong>{{ patient.token_no }}</strong></td>
+                            <td>{{ patient.patient_name }}</td>
+                            <td>{{ patient.wait_time }} min</td>
+                            <td>
+                                <span class="badge {% if patient.priority == 'Emergency' %}bg-danger{% elif patient.priority == 'High' %}bg-warning{% else %}bg-success{% endif %}">
+                                    {{ patient.priority }}
+                                </span>
+                            </td>
+                            <td>{{ patient.consultation_type or 'General' }}</td>
+                            <td>
+                                <a href="{{ url_for('start_consultation', patient_id=patient.patient_id) }}" class="btn btn-sm btn-primary">
+                                    <i class="bi bi-stethoscope"></i> Start
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">
+                                <i class="bi bi-inbox fs-4 d-block mb-2"></i>
+                                No patients in queue
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

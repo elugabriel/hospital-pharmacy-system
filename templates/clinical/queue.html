@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Queue - Clinical</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { background: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .navbar { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); }
+        .navbar-brand, .nav-link { color: white !important; }
+        .card { border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border: none; margin-bottom: 20px; }
+        .card-header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; border-radius: 15px 15px 0 0; }
+        .btn-primary { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border: none; }
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .queue-item {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+            border-left: 4px solid #28a745;
+        }
+        .queue-item.emergency { border-left-color: #dc3545; }
+        .queue-item.high { border-left-color: #ffc107; }
+        .queue-item.waiting { border-left-color: #17a2b8; }
+        .queue-item.in-progress { border-left-color: #ffc107; background: #fff8e1; }
+        .queue-item.completed { border-left-color: #28a745; opacity: 0.7; }
+        .badge-priority-emergency { background: #dc3545; }
+        .badge-priority-high { background: #ffc107; color: #000; }
+        .badge-priority-normal { background: #28a745; }
+        .welcome-bar {
+            background: white;
+            border-radius: 10px;
+            padding: 10px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('clinical_dashboard') }}"><i class="bi bi-heart-pulse"></i> Clinical Services</a>
+            <div class="ms-auto">
+                <span class="text-white me-3">Dr. {{ session.get('clinical_username') }}</span>
+                <a href="{{ url_for('clinical_logout') }}" class="btn btn-danger btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Welcome Bar -->
+        <div class="welcome-bar d-flex justify-content-between align-items-center">
+            <div>
+                <i class="bi bi-people fs-4 me-2"></i>
+                <span>My Patient Queue</span>
+            </div>
+            <div>
+                <i class="bi bi-calendar3 me-2"></i>
+                <span>{{ today_date if today_date is defined else '' }}</span>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <h3 class="text-warning mb-0">{{ total_waiting }}</h3>
+                    <small class="text-muted">Waiting</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <h3 class="text-primary mb-0">{{ total_in_progress }}</h3>
+                    <small class="text-muted">In Progress</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <h3 class="text-success mb-0">{{ completed_queue|length }}</h3>
+                    <small class="text-muted">Completed Today</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs for Queue Sections -->
+        <ul class="nav nav-tabs" id="queueTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="waiting-tab" data-bs-toggle="tab" data-bs-target="#waiting" type="button" role="tab">
+                    <i class="bi bi-clock-history"></i> Waiting Queue 
+                    {% if total_waiting > 0 %}<span class="badge bg-warning ms-1">{{ total_waiting }}</span>{% endif %}
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="inprogress-tab" data-bs-toggle="tab" data-bs-target="#inprogress" type="button" role="tab">
+                    <i class="bi bi-activity"></i> In Progress
+                    {% if total_in_progress > 0 %}<span class="badge bg-primary ms-1">{{ total_in_progress }}</span>{% endif %}
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed" type="button" role="tab">
+                    <i class="bi bi-check2-circle"></i> Completed
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content mt-3">
+            <!-- Waiting Queue Tab -->
+            <div class="tab-pane fade show active" id="waiting" role="tabpanel">
+                {% if waiting_queue %}
+                    {% for patient in waiting_queue %}
+                    <div class="queue-item waiting {% if patient.priority == 'Emergency' %}emergency{% elif patient.priority == 'High' %}high{% endif %}">
+                        <div class="row align-items-center">
+                            <div class="col-md-5">
+                                <div class="d-flex align-items-center">
+                                    <div class="me-3">
+                                        <div class="bg-light rounded-circle p-3 text-center" style="width: 60px; height: 60px;">
+                                            <i class="bi bi-person fs-1"></i>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">{{ patient.patient_name }}</h6>
+                                        <small class="text-muted">
+                                            <i class="bi bi-credit-card"></i> {{ patient.card_number or 'N/A' }}<br>
+                                            <i class="bi bi-telephone"></i> {{ patient.phone or 'N/A' }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div>
+                                    <span class="badge badge-priority-{{ patient.priority|lower }}">
+                                        {{ patient.priority }}
+                                    </span>
+                                    <span class="badge bg-secondary">{{ patient.consultation_type }}</span>
+                                </div>
+                                <div class="mt-1">
+                                    <small class="text-muted">
+                                        <i class="bi bi-hourglass-split"></i> Waiting: {{ patient.wait_time }} min
+                                    </small>
+                                </div>
+                                <div>
+                                    <small class="text-muted">
+                                        <i class="bi bi-ticket"></i> Token: {{ patient.token_no or patient.queue_no }}
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <button class="btn btn-success btn-sm" onclick="callPatient({{ patient.id }}, '{{ patient.patient_name }}')">
+                                    <i class="bi bi-megaphone"></i> Call Patient
+                                </button>
+                                <a href="{{ url_for('start_consultation', patient_id=patient.patient_id) }}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-stethoscope"></i> Start Consult
+                                </a>
+                                <button class="btn btn-danger btn-sm" onclick="removeFromQueue({{ patient.id }}, '{{ patient.patient_name }}')">
+                                    <i class="bi bi-x-circle"></i> Remove
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-info text-center">
+                        <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                        <h5>No patients waiting</h5>
+                        <p>Your queue is empty. Patients will appear here when assigned.</p>
+                        <a href="{{ url_for('clinical_patient_search') }}" class="btn btn-primary btn-sm">
+                            <i class="bi bi-stethoscope"></i> Start Consultation
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- In Progress Tab -->
+            <div class="tab-pane fade" id="inprogress" role="tabpanel">
+                {% if in_progress_queue %}
+                    {% for patient in in_progress_queue %}
+                    <div class="queue-item in-progress">
+                        <div class="row align-items-center">
+                            <div class="col-md-5">
+                                <div class="d-flex align-items-center">
+                                    <div class="me-3">
+                                        <div class="bg-light rounded-circle p-3 text-center" style="width: 60px; height: 60px;">
+                                            <i class="bi bi-person-check fs-1"></i>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">{{ patient.patient_name }}</h6>
+                                        <small class="text-muted">
+                                            <i class="bi bi-credit-card"></i> {{ patient.card_number or 'N/A' }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <span class="badge bg-primary">In Consultation</span>
+                                <div class="mt-1">
+                                    <small class="text-muted">
+                                        <i class="bi bi-ticket"></i> Token: {{ patient.token_no }}
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="col-md-3 text-end">
+                                <a href="{{ url_for('start_consultation', patient_id=patient.patient_id) }}" class="btn btn-warning btn-sm">
+                                    <i class="bi bi-pencil"></i> Continue
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-info text-center">
+                        <i class="bi bi-info-circle"></i> No consultations in progress
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Completed Tab -->
+            <div class="tab-pane fade" id="completed" role="tabpanel">
+                {% if completed_queue %}
+                    {% for patient in completed_queue %}
+                    <div class="queue-item completed">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-center">
+                                    <div class="me-3">
+                                        <i class="bi bi-check-circle-fill text-success fs-3"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">{{ patient.patient_name }}</h6>
+                                        <small class="text-muted">
+                                            <i class="bi bi-credit-card"></i> {{ patient.card_number or 'N/A' }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <a href="{{ url_for('view_patient', patient_id=patient.patient_id) }}" class="btn btn-info btn-sm">
+                                    <i class="bi bi-eye"></i> View Record
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-info text-center">
+                        <i class="bi bi-info-circle"></i> No completed consultations today
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Call Patient Modal -->
+    <div class="modal fade" id="callModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-megaphone"></i> Call Patient</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center py-4">
+                    <i class="bi bi-volume-up fs-1 mb-3 d-block text-success"></i>
+                    <h4 id="callPatientName"></h4>
+                    <p>Please proceed to consultation room</p>
+                    <div class="alert alert-info mt-3">
+                        <i class="bi bi-info-circle"></i> The patient will be notified via display screen
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <form method="POST" id="callForm" action="{{ url_for('clinical_call_patient') }}">
+                        <input type="hidden" name="queue_id" id="callQueueId">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle"></i> Confirm Call
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Remove from Queue Modal -->
+    <div class="modal fade" id="removeModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Remove from Queue</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center py-4">
+                    <i class="bi bi-question-circle fs-1 mb-3 d-block text-danger"></i>
+                    <h4 id="removePatientName"></h4>
+                    <p>Are you sure you want to remove this patient from the queue?</p>
+                    <div class="alert alert-warning mt-3">
+                        <i class="bi bi-exclamation-triangle"></i> This action cannot be undone.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form method="POST" id="removeForm" action="{{ url_for('clinical_remove_from_queue') }}">
+                        <input type="hidden" name="queue_id" id="removeQueueId">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Remove
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function callPatient(queueId, patientName) {
+            document.getElementById('callPatientName').textContent = patientName;
+            document.getElementById('callQueueId').value = queueId;
+            new bootstrap.Modal(document.getElementById('callModal')).show();
+        }
+        
+        function removeFromQueue(queueId, patientName) {
+            document.getElementById('removePatientName').textContent = patientName;
+            document.getElementById('removeQueueId').value = queueId;
+            new bootstrap.Modal(document.getElementById('removeModal')).show();
+        }
+        
+        // Auto-refresh queue every 30 seconds
+        setTimeout(function() {
+            location.reload();
+        }, 30000);
+    </script>
+</body>
+</html>

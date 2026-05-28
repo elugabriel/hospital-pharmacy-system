@@ -30,9 +30,206 @@ def get_db_connection():
         return None
 
 # -------------------- DATABASE INITIALIZATION --------------------
+def update_prescriptions_table():
+    """Update prescriptions table to allow NULL patient_id"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Check if prescriptions table exists
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='prescriptions'")
+        if cur.fetchone():
+            # Get current table info
+            cur.execute("PRAGMA table_info(prescriptions)")
+            columns = [col[1] for col in cur.fetchall()]
+            
+            # Check if patient_id column is set to NOT NULL
+            cur.execute("PRAGMA table_info(prescriptions)")
+            for col in cur.fetchall():
+                if col[1] == 'patient_id' and col[3] == 1:  # notnull = 1
+                    # Need to recreate table without NOT NULL constraint
+                    print("Updating prescriptions table to allow NULL patient_id...")
+                    
+                    # Create temporary table
+                    cur.execute("""
+                        CREATE TABLE prescriptions_temp (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            prescription_no VARCHAR(50) UNIQUE NOT NULL,
+                            patient_id INTEGER,
+                            patient_name VARCHAR(200) NOT NULL,
+                            doctor_id INTEGER NOT NULL,
+                            doctor_name VARCHAR(100) NOT NULL,
+                            drug_id INTEGER,
+                            drug_name VARCHAR(100) NOT NULL,
+                            strength VARCHAR(50),
+                            dosage VARCHAR(100) NOT NULL,
+                            frequency VARCHAR(100) NOT NULL,
+                            duration VARCHAR(50) NOT NULL,
+                            quantity INTEGER NOT NULL,
+                            instructions TEXT,
+                            refills INTEGER DEFAULT 0,
+                            is_controlled BOOLEAN DEFAULT 0,
+                            status VARCHAR(20) DEFAULT 'Active',
+                            prescribed_date DATE NOT NULL,
+                            prescribed_time TIME NOT NULL,
+                            expires_date DATE,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    """)
+                    
+                    # Copy data
+                    cur.execute("""
+                        INSERT INTO prescriptions_temp SELECT * FROM prescriptions
+                    """)
+                    
+                    # Drop old table
+                    cur.execute("DROP TABLE prescriptions")
+                    
+                    # Rename temp table
+                    cur.execute("ALTER TABLE prescriptions_temp RENAME TO prescriptions")
+                    
+                    conn.commit()
+                    print("Prescriptions table updated successfully!")
+                    break
+            
+    except Exception as e:
+        app.logger.error(f"Error updating prescriptions table: {e}")
+    finally:
+        cur.close()
+        conn.close()
+        
+        
 def create_tables():
     """Create all necessary tables if they don't exist."""
     queries = {
+        "patients": """
+            CREATE TABLE IF NOT EXISTS patients (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id VARCHAR(50) UNIQUE NOT NULL,
+                hospital_no VARCHAR(50) UNIQUE NOT NULL,
+                card_number VARCHAR(50) UNIQUE,
+                first_name VARCHAR(100) NOT NULL,
+                last_name VARCHAR(100) NOT NULL,
+                date_of_birth DATE NOT NULL,
+                gender VARCHAR(10) NOT NULL,
+                blood_group VARCHAR(5),
+                genotype VARCHAR(5),
+                phone VARCHAR(20),
+                email VARCHAR(100),
+                address TEXT,
+                emergency_contact_name VARCHAR(100),
+                emergency_contact_phone VARCHAR(20),
+                occupation VARCHAR(100),
+                marital_status VARCHAR(20),
+                nationality VARCHAR(50),
+                religion VARCHAR(50),
+                next_of_kin VARCHAR(100),
+                next_of_kin_phone VARCHAR(20),
+                registration_date DATE NOT NULL,
+                registration_time TIME NOT NULL,
+                status VARCHAR(20) DEFAULT 'Active',
+                profile_photo TEXT,
+                notes TEXT,
+                created_by INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+
+        "appointments": """
+            CREATE TABLE IF NOT EXISTS appointments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                appointment_no VARCHAR(50) UNIQUE NOT NULL,
+                patient_id INTEGER NOT NULL REFERENCES patients(id),
+                patient_name VARCHAR(200) NOT NULL,
+                doctor_name VARCHAR(100),
+                department VARCHAR(100),
+                appointment_date DATE NOT NULL,
+                appointment_time TIME NOT NULL,
+                purpose TEXT,
+                status VARCHAR(20) DEFAULT 'Scheduled',
+                priority VARCHAR(20) DEFAULT 'Normal',
+                notes TEXT,
+                created_by INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+
+        "queue": """
+            CREATE TABLE IF NOT EXISTS queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                token_no VARCHAR(50) UNIQUE NOT NULL,
+                patient_id INTEGER NOT NULL REFERENCES patients(id),
+                patient_name VARCHAR(200) NOT NULL,
+                service_type VARCHAR(100) NOT NULL,
+                priority VARCHAR(20) DEFAULT 'Normal',
+                status VARCHAR(20) DEFAULT 'Waiting',
+                queue_position INTEGER,
+                assigned_to VARCHAR(100),
+                called_at TIMESTAMP,
+                called_by VARCHAR(100),
+                completed_at TIMESTAMP,
+                waiting_time INTEGER,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+
+        "patient_services": """
+            CREATE TABLE IF NOT EXISTS patient_services (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                service_no VARCHAR(50) UNIQUE NOT NULL,
+                patient_id INTEGER NOT NULL REFERENCES patients(id),
+                patient_name VARCHAR(200) NOT NULL,
+                service_type VARCHAR(100) NOT NULL,
+                check_in_time TIMESTAMP NOT NULL,
+                check_out_time TIMESTAMP,
+                status VARCHAR(20) DEFAULT 'Active',
+                ward_requested BOOLEAN DEFAULT 0,
+                ward_type VARCHAR(50),
+                is_emergency BOOLEAN DEFAULT 0,
+                notes TEXT,
+                created_by INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+
+        "patient_notes": """
+            CREATE TABLE IF NOT EXISTS patient_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id INTEGER NOT NULL REFERENCES patients(id),
+                note_type VARCHAR(50),
+                note TEXT NOT NULL,
+                created_by INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+
+        "patient_communication": """
+            CREATE TABLE IF NOT EXISTS patient_communication (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id INTEGER NOT NULL REFERENCES patients(id),
+                communication_type VARCHAR(50),
+                subject VARCHAR(200),
+                message TEXT,
+                status VARCHAR(20) DEFAULT 'Sent',
+                sent_by INTEGER NOT NULL,
+                sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+
+        "patient_users": """
+            CREATE TABLE IF NOT EXISTS patient_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                full_name VARCHAR(100) NOT NULL,
+                role VARCHAR(50) DEFAULT 'Receptionist',
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
         "pharmacists": """
             CREATE TABLE IF NOT EXISTS pharmacists (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -284,6 +481,289 @@ def create_tables():
                 rejection_reason TEXT,
                 notes TEXT
             );
+        """,
+        "lab_tests": """
+            CREATE TABLE IF NOT EXISTS lab_tests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                test_id VARCHAR(50) UNIQUE NOT NULL,
+                test_name VARCHAR(100) NOT NULL,
+                category VARCHAR(50),
+                price DECIMAL(10, 2) NOT NULL,
+                description TEXT,
+                preparation_instructions TEXT,
+                normal_range VARCHAR(100),
+                turnaround_time VARCHAR(50),
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+        "lab_requests": """
+            CREATE TABLE IF NOT EXISTS lab_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_no VARCHAR(50) UNIQUE NOT NULL,
+                patient_name VARCHAR(100) NOT NULL,
+                patient_id VARCHAR(50),
+                patient_age INTEGER,
+                patient_gender VARCHAR(10),
+                doctor_name VARCHAR(100),
+                test_ids TEXT,
+                test_names TEXT,
+                total_amount DECIMAL(10, 2) NOT NULL,
+                discount DECIMAL(10, 2) DEFAULT 0,
+                grand_total DECIMAL(10, 2) NOT NULL,
+                amount_paid DECIMAL(10, 2) DEFAULT 0,
+                balance DECIMAL(10, 2) DEFAULT 0,
+                status VARCHAR(20) DEFAULT 'Pending',
+                priority VARCHAR(20) DEFAULT 'Normal',
+                requested_date DATE NOT NULL,
+                collected_date DATE,
+                collected_by VARCHAR(100),
+                completed_date DATE,
+                completed_by VARCHAR(100),
+                approved_by VARCHAR(100),
+                notes TEXT,
+                created_by INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+        "lab_results": """
+            CREATE TABLE IF NOT EXISTS lab_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_id INTEGER NOT NULL REFERENCES lab_requests(id),
+                test_id INTEGER NOT NULL REFERENCES lab_tests(id),
+                test_name VARCHAR(100) NOT NULL,
+                result_value VARCHAR(200),
+                normal_range VARCHAR(100),
+                unit VARCHAR(50),
+                interpretation VARCHAR(20),
+                remarks TEXT,
+                performed_by VARCHAR(100),
+                performed_date DATE,
+                verified_by VARCHAR(100),
+                verified_date DATE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+        "lab_users": """
+            CREATE TABLE IF NOT EXISTS lab_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                full_name VARCHAR(100) NOT NULL,
+                role VARCHAR(50) DEFAULT 'Lab Technician',
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+        
+       
+
+        "consultations": """
+            CREATE TABLE IF NOT EXISTS consultations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                consultation_no VARCHAR(50) UNIQUE NOT NULL,
+                patient_id INTEGER NOT NULL REFERENCES patients(id),
+                patient_name VARCHAR(200) NOT NULL,
+                doctor_id INTEGER NOT NULL,
+                doctor_name VARCHAR(100) NOT NULL,
+                consultation_date DATE NOT NULL,
+                consultation_time TIME NOT NULL,
+                status VARCHAR(20) DEFAULT 'In Progress',
+                chief_complaint TEXT,
+                history_of_present_illness TEXT,
+                past_medical_history TEXT,
+                family_history TEXT,
+                social_history TEXT,
+                review_of_systems TEXT,
+                physical_exam TEXT,
+                diagnosis TEXT,
+                treatment_plan TEXT,
+                follow_up_date DATE,
+                follow_up_instructions TEXT,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP,
+                FOREIGN KEY (patient_id) REFERENCES patients(id)
+            );
+        """,
+
+        "clinical_notes": """
+            CREATE TABLE IF NOT EXISTS clinical_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                note_no VARCHAR(50) UNIQUE NOT NULL,
+                patient_id INTEGER NOT NULL REFERENCES patients(id),
+                patient_name VARCHAR(200) NOT NULL,
+                doctor_id INTEGER NOT NULL,
+                doctor_name VARCHAR(100) NOT NULL,
+                note_type VARCHAR(50), -- SOAP, Progress, Discharge, Procedure
+                subjective TEXT,
+                objective TEXT,
+                assessment TEXT,
+                plan TEXT,
+                note_date DATE NOT NULL,
+                note_time TIME NOT NULL,
+                status VARCHAR(20) DEFAULT 'Draft',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+
+        "prescriptions": """
+            CREATE TABLE IF NOT EXISTS prescriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                prescription_no VARCHAR(50) UNIQUE NOT NULL,
+                patient_id INTEGER NOT NULL REFERENCES patients(id),
+                patient_name VARCHAR(200) NOT NULL,
+                doctor_id INTEGER NOT NULL,
+                doctor_name VARCHAR(100) NOT NULL,
+                drug_id INTEGER REFERENCES drugs(id),
+                drug_name VARCHAR(100) NOT NULL,
+                strength VARCHAR(50),
+                dosage VARCHAR(100) NOT NULL,
+                frequency VARCHAR(100) NOT NULL,
+                duration VARCHAR(50) NOT NULL,
+                quantity INTEGER NOT NULL,
+                instructions TEXT,
+                refills INTEGER DEFAULT 0,
+                is_controlled BOOLEAN DEFAULT 0,
+                status VARCHAR(20) DEFAULT 'Active',
+                prescribed_date DATE NOT NULL,
+                prescribed_time TIME NOT NULL,
+                expires_date DATE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+
+        "doctor_queue": """
+            CREATE TABLE IF NOT EXISTS doctor_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                queue_no VARCHAR(50) UNIQUE NOT NULL,
+                patient_id INTEGER NOT NULL REFERENCES patients(id),
+                patient_name VARCHAR(200) NOT NULL,
+                doctor_id INTEGER NOT NULL,
+                doctor_name VARCHAR(100) NOT NULL,
+                priority VARCHAR(20) DEFAULT 'Normal',
+                status VARCHAR(20) DEFAULT 'Waiting',
+                wait_time_minutes INTEGER,
+                consultation_type VARCHAR(50), -- New, Follow-up, Review, Emergency
+                token_no VARCHAR(50),
+                called_at TIMESTAMP,
+                started_at TIMESTAMP,
+                completed_at TIMESTAMP,
+                vitals_recorded BOOLEAN DEFAULT 0,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+
+        "lab_orders": """
+            CREATE TABLE IF NOT EXISTS lab_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_no VARCHAR(50) UNIQUE NOT NULL,
+                patient_id INTEGER NOT NULL REFERENCES patients(id),
+                patient_name VARCHAR(200) NOT NULL,
+                doctor_id INTEGER NOT NULL,
+                doctor_name VARCHAR(100) NOT NULL,
+                test_name VARCHAR(100) NOT NULL,
+                urgency VARCHAR(20) DEFAULT 'Routine',
+                status VARCHAR(20) DEFAULT 'Pending', -- Pending, Collected, Processing, Completed
+                ordered_date DATE NOT NULL,
+                ordered_time TIME NOT NULL,
+                collected_date DATE,
+                collected_by VARCHAR(100),
+                result_date DATE,
+                result_value TEXT,
+                normal_range VARCHAR(100),
+                interpretation VARCHAR(50),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+
+        "imaging_orders": """
+            CREATE TABLE IF NOT EXISTS imaging_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_no VARCHAR(50) UNIQUE NOT NULL,
+                patient_id INTEGER NOT NULL REFERENCES patients(id),
+                patient_name VARCHAR(200) NOT NULL,
+                doctor_id INTEGER NOT NULL,
+                doctor_name VARCHAR(100) NOT NULL,
+                imaging_type VARCHAR(50) NOT NULL, -- X-Ray, CT, MRI, Ultrasound, etc.
+                body_part VARCHAR(100) NOT NULL,
+                urgency VARCHAR(20) DEFAULT 'Routine',
+                clinical_indication TEXT,
+                status VARCHAR(20) DEFAULT 'Pending',
+                ordered_date DATE NOT NULL,
+                ordered_time TIME NOT NULL,
+                performed_date DATE,
+                report_date DATE,
+                report_finding TEXT,
+                report_impression TEXT,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+
+        "referrals": """
+            CREATE TABLE IF NOT EXISTS referrals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                referral_no VARCHAR(50) UNIQUE NOT NULL,
+                patient_id INTEGER NOT NULL REFERENCES patients(id),
+                patient_name VARCHAR(200) NOT NULL,
+                referring_doctor_id INTEGER NOT NULL,
+                referring_doctor_name VARCHAR(100) NOT NULL,
+                referred_to VARCHAR(100) NOT NULL,
+                referred_to_doctor VARCHAR(100),
+                specialization VARCHAR(100) NOT NULL,
+                reason TEXT NOT NULL,
+                urgency VARCHAR(20) DEFAULT 'Normal',
+                status VARCHAR(20) DEFAULT 'Pending',
+                referral_date DATE NOT NULL,
+                referral_time TIME NOT NULL,
+                acceptance_date DATE,
+                rejection_reason TEXT,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+
+        "vitals": """
+            CREATE TABLE IF NOT EXISTS vitals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                vitals_no VARCHAR(50) UNIQUE NOT NULL,
+                patient_id INTEGER NOT NULL REFERENCES patients(id),
+                patient_name VARCHAR(200) NOT NULL,
+                recorded_by VARCHAR(100) NOT NULL,
+                recorded_date DATE NOT NULL,
+                recorded_time TIME NOT NULL,
+                temperature DECIMAL(4,1),
+                blood_pressure_systolic INTEGER,
+                blood_pressure_diastolic INTEGER,
+                heart_rate INTEGER,
+                respiratory_rate INTEGER,
+                oxygen_saturation INTEGER,
+                weight DECIMAL(5,2),
+                height DECIMAL(5,2),
+                bmi DECIMAL(4,1),
+                pain_score INTEGER,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+
+        "clinical_users": """
+            CREATE TABLE IF NOT EXISTS clinical_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                full_name VARCHAR(100) NOT NULL,
+                email VARCHAR(100),
+                specialization VARCHAR(100),
+                license_number VARCHAR(50),
+                role VARCHAR(50) DEFAULT 'Doctor',
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         """
     }
 
@@ -309,7 +789,10 @@ def create_tables():
         "CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);",
         "CREATE INDEX IF NOT EXISTS idx_leaves_status ON leaves(status);",
         "CREATE INDEX IF NOT EXISTS idx_shift_swap_status ON shift_swap_requests(status);",
-        "CREATE INDEX IF NOT EXISTS idx_shift_swap_schedule ON shift_swap_requests(schedule_id);"
+        "CREATE INDEX IF NOT EXISTS idx_shift_swap_schedule ON shift_swap_requests(schedule_id);",
+        "CREATE INDEX IF NOT EXISTS idx_lab_requests_status ON lab_requests(status);",
+        "CREATE INDEX IF NOT EXISTS idx_lab_requests_patient ON lab_requests(patient_name);",
+        "CREATE INDEX IF NOT EXISTS idx_lab_results_request ON lab_results(request_id);"
     ]
     
     for index_query in indexes:
@@ -323,11 +806,14 @@ def create_tables():
     conn.close()
 
 def create_default_users():
-    """Create default users for pharmacy and billing modules."""
+    """Create default users for all modules."""
     default_users = {
         "pharmacists": ("pharmacist1", "pharma123"),
-        "billing_users": ("billing1", "billing123")
+        "billing_users": ("billing1", "billing123"),
+        "lab_users": ("labtech1", "lab123"),
+        "patient_users": ("reception1", "reception123")
     }
+    # Note: clinical_users is handled separately in create_default_clinical_user()
 
     conn = get_db_connection()
     if not conn:
@@ -337,159 +823,28 @@ def create_default_users():
     for table, (username, password) in default_users.items():
         hashed_pw = generate_password_hash(password)
         try:
-            cursor.execute(f"""
-                INSERT OR REPLACE INTO {table} (username, password)
-                VALUES (?, ?)
-            """, (username, hashed_pw))
+            if table == "lab_users":
+                cursor.execute(f"""
+                    INSERT OR REPLACE INTO {table} (username, password, full_name, role)
+                    VALUES (?, ?, ?, ?)
+                """, (username, hashed_pw, 'Lab Technician', 'Lab Technician'))
+            elif table == "patient_users":
+                cursor.execute(f"""
+                    INSERT OR REPLACE INTO {table} (username, password, full_name, role, is_active)
+                    VALUES (?, ?, ?, ?, 1)
+                """, (username, hashed_pw, 'Receptionist', 'Receptionist'))
+            else:
+                cursor.execute(f"""
+                    INSERT OR REPLACE INTO {table} (username, password)
+                    VALUES (?, ?)
+                """, (username, hashed_pw))
         except Exception as e:
             app.logger.error(f"Error creating default user {username}: {e}")
     conn.commit()
     cursor.close()
     conn.close()
-
-def create_default_hr_data():
-    """Insert default HR data into SQLite tables."""
-    conn = get_db_connection()
-    if not conn:
-        return
     
-    cursor = conn.cursor()
-    
-    # Default password
-    default_password = 'hr@admin123'
-    hashed_password = generate_password_hash(default_password)
-    
-    # Insert or update default HR users
-    try:
-        # Check if hr_admin exists
-        cursor.execute("SELECT id, password FROM hr_users WHERE username = 'hr_admin'")
-        admin = cursor.fetchone()
         
-        if admin:
-            # Check if password needs updating (if it's not hashed or different)
-            try:
-                if not check_password_hash(admin[1], default_password):
-                    cursor.execute("UPDATE hr_users SET password = ? WHERE username = 'hr_admin'", (hashed_password,))
-                    print("Updated hr_admin password")
-            except (ValueError, TypeError):
-                # Password is not hashed, update it
-                cursor.execute("UPDATE hr_users SET password = ? WHERE username = 'hr_admin'", (hashed_password,))
-                print("Updated hr_admin password (was not hashed)")
-        else:
-            # Insert new admin
-            cursor.execute("""
-                INSERT INTO hr_users (username, password, full_name, email, role, is_active) 
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, ('hr_admin', hashed_password, 'HR Administrator', 'admin@hospital.com', 'HR Manager', 1))
-            print("Created hr_admin user")
-        
-        # Check if hr_staff exists
-        cursor.execute("SELECT id, password FROM hr_users WHERE username = 'hr_staff'")
-        staff = cursor.fetchone()
-        
-        if staff:
-            # Check if password needs updating
-            try:
-                if not check_password_hash(staff[1], default_password):
-                    cursor.execute("UPDATE hr_users SET password = ? WHERE username = 'hr_staff'", (hashed_password,))
-                    print("Updated hr_staff password")
-            except (ValueError, TypeError):
-                # Password is not hashed, update it
-                cursor.execute("UPDATE hr_users SET password = ? WHERE username = 'hr_staff'", (hashed_password,))
-                print("Updated hr_staff password (was not hashed)")
-        else:
-            # Insert new staff
-            cursor.execute("""
-                INSERT INTO hr_users (username, password, full_name, email, role, is_active) 
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, ('hr_staff', hashed_password, 'HR Staff', 'staff@hospital.com', 'HR Officer', 1))
-            print("Created hr_staff user")
-            
-    except Exception as e:
-        app.logger.error(f"Error inserting HR users: {e}")
-        print(f"HR users error: {e}")
-    
-    # Insert sample departments
-    departments = [
-        ('Administration', 'ADMIN', 'Hospital Administration and Management', 'Dr. John Smith'),
-        ('Medical', 'MED', 'Medical Services Department', 'Dr. Sarah Johnson'),
-        ('Nursing', 'NURS', 'Nursing Services', 'Mrs. Grace Williams'),
-        ('Pharmacy', 'PHARM', 'Pharmacy Department', 'Mr. Michael Brown'),
-        ('Laboratory', 'LAB', 'Laboratory Services', 'Dr. David Miller'),
-        ('Radiology', 'RAD', 'Radiology Department', 'Dr. Lisa Davis'),
-        ('Finance', 'FIN', 'Finance and Billing Department', 'Mr. Robert Wilson'),
-        ('Human Resources', 'HR', 'Human Resources Department', 'Ms. Patricia Taylor'),
-        ('Maintenance', 'MAINT', 'Facility Maintenance', 'Mr. Thomas Anderson'),
-        ('Security', 'SEC', 'Hospital Security', 'Mr. Richard Clark')
-    ]
-    
-    for dept in departments:
-        try:
-            cursor.execute("""
-                INSERT OR IGNORE INTO departments (name, code, description, head_of_dept, status) 
-                VALUES (?, ?, ?, ?, 'Active')
-            """, dept)
-        except Exception as e:
-            app.logger.error(f"Error inserting department {dept[0]}: {e}")
-    
-    # Get admin department ID for sample staff
-    cursor.execute("SELECT id FROM departments WHERE code = 'ADMIN' AND status = 'Active' LIMIT 1;")
-    admin_dept = cursor.fetchone()
-    
-    # Insert sample staff if departments exist
-    if admin_dept:
-        admin_dept_id = admin_dept[0]
-        sample_staff = [
-            ('EMP001', 'John', 'Doe', admin_dept_id, 'Hospital Administrator', 'Full-Time', 
-             'john.doe@hospital.com', '08012345678', '2022-01-15', 850000.00, 'Jane Doe - 08087654321', '123 Admin Street, Enugu'),
-            ('EMP002', 'Sarah', 'Johnson', admin_dept_id, 'Senior Doctor', 'Full-Time', 
-             'sarah.j@hospital.com', '08023456789', '2021-03-20', 1200000.00, 'Mark Johnson - 08098765432', '456 Medical Road, Enugu'),
-            ('EMP003', 'Michael', 'Brown', admin_dept_id, 'Chief Pharmacist', 'Full-Time', 
-             'michael.b@hospital.com', '08034567890', '2020-06-10', 950000.00, 'Emily Brown - 08076543210', '789 Pharmacy Lane, Enugu'),
-            ('EMP004', 'Grace', 'Williams', admin_dept_id, 'Head Nurse', 'Full-Time', 
-             'grace.w@hospital.com', '08045678901', '2019-08-05', 750000.00, 'James Williams - 08065432109', '321 Nursing Avenue, Enugu'),
-            ('EMP005', 'David', 'Miller', admin_dept_id, 'Lab Technician', 'Full-Time', 
-             'david.m@hospital.com', '08056789012', '2022-11-30', 650000.00, 'Sarah Miller - 08054321098', '654 Lab Street, Enugu')
-        ]
-        
-        for staff in sample_staff:
-            try:
-                cursor.execute("""
-                    INSERT OR IGNORE INTO staff (
-                        staff_id, first_name, last_name, department_id, position, 
-                        employment_type, email, phone, hire_date, salary, 
-                        emergency_contact, address, status
-                    ) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')
-                """, staff)
-            except Exception as e:
-                app.logger.error(f"Error inserting staff {staff[0]}: {e}")
-        
-        print(f"Inserted {len(sample_staff)} sample staff records")
-    
-    conn.commit()
-    
-    # Verify the data was inserted correctly
-    try:
-        cursor.execute("SELECT COUNT(*) FROM hr_users")
-        user_count = cursor.fetchone()[0]
-        print(f"Total HR users in database: {user_count}")
-        
-        cursor.execute("SELECT COUNT(*) FROM departments")
-        dept_count = cursor.fetchone()[0]
-        print(f"Total departments in database: {dept_count}")
-        
-        cursor.execute("SELECT COUNT(*) FROM staff")
-        staff_count = cursor.fetchone()[0]
-        print(f"Total staff in database: {staff_count}")
-        
-    except Exception as e:
-        app.logger.error(f"Error verifying data: {e}")
-    
-    cursor.close()
-    conn.close()
-    print("HR data initialization completed")
-
 # -------------------- HELPER FUNCTIONS --------------------
 def format_currency(amount):
     """Format amount as Nigerian Naira currency."""
@@ -5047,9 +5402,2867 @@ def check_availability():
     finally:
         cur.close()
         conn.close()
-# -------------------- RUN APP --------------------
+        
+# -------------------- ROUTES: LABORATORY MODULE --------------------
+
+@app.route('/laboratory/login', methods=['GET', 'POST'])
+def laboratory_login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        conn = get_db_connection()
+        if not conn:
+            flash("Database connection error", "danger")
+            return render_template("laboratory_login.html")
+
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, username, password, full_name, role FROM lab_users WHERE username=? AND is_active=1",
+            (username,)
+        )
+        user = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if user and check_password_hash(user[2], password):
+            session['lab_user_id'] = user[0]
+            session['lab_username'] = user[1]
+            session['lab_full_name'] = user[3]
+            session['lab_role'] = user[4]
+            return redirect(url_for('laboratory_dashboard'))
+        else:
+            flash("Invalid username or password", "danger")
+
+    return render_template("laboratory_login.html")
+
+@app.route('/laboratory/dashboard')
+def laboratory_dashboard():
+    if 'lab_user_id' not in session:
+        return redirect(url_for('laboratory_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get statistics
+        cur.execute("SELECT COUNT(*) FROM lab_requests WHERE status = 'Pending'")
+        pending_tests = cur.fetchone()[0] or 0
+        
+        cur.execute("SELECT COUNT(*) FROM lab_requests WHERE status = 'In Progress'")
+        in_progress = cur.fetchone()[0] or 0
+        
+        cur.execute("SELECT COUNT(*) FROM lab_requests WHERE status = 'Completed' AND DATE(completed_date) = DATE('now')")
+        completed_today = cur.fetchone()[0] or 0
+        
+        cur.execute("SELECT COUNT(*) FROM lab_tests WHERE is_active = 1")
+        total_tests = cur.fetchone()[0] or 0
+        
+        # Get recent requests
+        cur.execute("""
+            SELECT id, request_no, patient_name, test_names, status, priority, requested_date
+            FROM lab_requests
+            ORDER BY created_at DESC
+            LIMIT 10
+        """)
+        recent_requests = cur.fetchall()
+        
+    except Exception as e:
+        app.logger.error(f"Error loading lab dashboard: {e}")
+        pending_tests = in_progress = completed_today = total_tests = 0
+        recent_requests = []
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template(
+        "laboratory_dashboard.html",
+        pending_tests=pending_tests,
+        in_progress=in_progress,
+        completed_today=completed_today,
+        total_tests=total_tests,
+        recent_requests=recent_requests,
+        lab_user=session.get('lab_full_name')
+    )
+
+@app.route('/laboratory/logout')
+def laboratory_logout():
+    session.pop('lab_user_id', None)
+    session.pop('lab_username', None)
+    session.pop('lab_full_name', None)
+    session.pop('lab_role', None)
+    flash("Logged out successfully", "success")
+    return redirect(url_for('laboratory_login'))
+
+@app.route('/laboratory/tests')
+def lab_tests():
+    if 'lab_user_id' not in session:
+        return redirect(url_for('laboratory_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT id, test_id, test_name, category, price, description, 
+               normal_range, turnaround_time, is_active
+        FROM lab_tests
+        ORDER BY test_name
+    """)
+    tests = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return render_template("lab_tests.html", tests=tests)
+
+@app.route('/laboratory/tests/add', methods=['GET', 'POST'])
+def add_lab_test():
+    if 'lab_user_id' not in session:
+        return redirect(url_for('laboratory_login'))
+    
+    if request.method == 'POST':
+        test_id = request.form.get('test_id')
+        test_name = request.form.get('test_name')
+        category = request.form.get('category')
+        price = float(request.form.get('price', 0))
+        description = request.form.get('description')
+        preparation_instructions = request.form.get('preparation_instructions')
+        normal_range = request.form.get('normal_range')
+        turnaround_time = request.form.get('turnaround_time')
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        try:
+            cur.execute("""
+                INSERT INTO lab_tests (test_id, test_name, category, price, description,
+                                       preparation_instructions, normal_range, turnaround_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (test_id, test_name, category, price, description, 
+                  preparation_instructions, normal_range, turnaround_time))
+            conn.commit()
+            flash(f"Test '{test_name}' added successfully!", "success")
+            return redirect(url_for('lab_tests'))
+        except Exception as e:
+            conn.rollback()
+            flash(f"Error adding test: {str(e)}", "danger")
+        finally:
+            cur.close()
+            conn.close()
+    
+    return render_template("add_lab_test.html")
+
+@app.route('/laboratory/requests')
+def lab_requests():
+    if 'lab_user_id' not in session:
+        return redirect(url_for('laboratory_login'))
+    
+    status_filter = request.args.get('status', '')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    query = """
+        SELECT id, request_no, patient_name, patient_id, test_names, 
+               grand_total as total_amount, status, priority, requested_date
+        FROM lab_requests
+    """
+    params = []
+    
+    if status_filter:
+        query += " WHERE status = ?"
+        params.append(status_filter)
+    
+    query += " ORDER BY requested_date DESC"
+    
+    cur.execute(query, params)
+    lab_requests_list = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return render_template("lab_requests.html", requests=lab_requests_list, status_filter=status_filter)
+
+@app.route('/laboratory/request/new', methods=['GET', 'POST'])
+def new_lab_request():
+    if 'lab_user_id' not in session:
+        return redirect(url_for('laboratory_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    if request.method == 'POST':
+        patient_name = request.form.get('patient_name')
+        patient_id = request.form.get('patient_id')
+        patient_age = request.form.get('patient_age')
+        patient_gender = request.form.get('patient_gender')
+        doctor_name = request.form.get('doctor_name')
+        test_ids = request.form.getlist('test_ids')
+        custom_prices_json = request.form.get('custom_prices', '{}')
+        discount_amount = float(request.form.get('discount_amount', 0))
+        priority = request.form.get('priority', 'Normal')
+        notes = request.form.get('notes')
+        
+        if not patient_name:
+            flash("Patient name is required", "danger")
+            return redirect(url_for('new_lab_request'))
+        
+        if not test_ids:
+            flash("Please add at least one test", "danger")
+            return redirect(url_for('new_lab_request'))
+        
+        # Parse custom prices
+        import json
+        custom_prices = json.loads(custom_prices_json)
+        
+        # Get test details
+        placeholders = ','.join(['?' for _ in test_ids])
+        cur.execute(f"""
+            SELECT id, test_name, price FROM lab_tests 
+            WHERE id IN ({placeholders}) AND is_active = 1
+        """, test_ids)
+        tests = cur.fetchall()
+        
+        if not tests:
+            flash("Selected tests not found", "danger")
+            return redirect(url_for('new_lab_request'))
+        
+        # Use custom prices if provided, otherwise use default prices
+        test_names = []
+        total_amount = 0
+        for test in tests:
+            test_id_str = str(test[0])
+            test_names.append(test[1])
+            price = custom_prices.get(test_id_str, test[2])
+            total_amount += float(price)
+        
+        # Apply discount
+        grand_total = total_amount - discount_amount
+        if grand_total < 0:
+            grand_total = 0
+        
+        # Generate unique request number
+        request_no = f"LAB-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
+        
+        try:
+            cur.execute("""
+                INSERT INTO lab_requests (
+                    request_no, patient_name, patient_id, patient_age, patient_gender,
+                    doctor_name, test_ids, test_names, total_amount, discount, grand_total,
+                    priority, notes, requested_date, created_by, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')
+            """, (request_no, patient_name, patient_id, patient_age, patient_gender,
+                  doctor_name, ','.join(test_ids), ','.join(test_names), total_amount,
+                  discount_amount, grand_total, priority, notes, 
+                  date.today().isoformat(), session['lab_user_id']))
+            
+            conn.commit()
+            flash(f"Lab request {request_no} created successfully! Total: ₦{grand_total:,.2f}", "success")
+            return redirect(url_for('lab_requests'))
+            
+        except Exception as e:
+            conn.rollback()
+            app.logger.error(f"Error creating request: {e}")
+            flash(f"Error creating request: {str(e)}", "danger")
+    
+    # GET request - show form
+    cur.execute("SELECT id, test_name, price, category FROM lab_tests WHERE is_active = 1 ORDER BY category, test_name")
+    tests = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return render_template("new_lab_request.html", tests=tests)
+
+@app.route('/laboratory/request/<int:request_id>')
+def view_lab_request(request_id):
+    if 'lab_user_id' not in session:
+        return redirect(url_for('laboratory_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("SELECT * FROM lab_requests WHERE id = ?", (request_id,))
+    lab_request = cur.fetchone()
+    
+    if lab_request:
+        # Get results if any
+        cur.execute("SELECT * FROM lab_results WHERE request_id = ?", (request_id,))
+        results = cur.fetchall()
+    else:
+        results = []
+    
+    cur.close()
+    conn.close()
+    
+    if not lab_request:
+        flash("Lab request not found", "danger")
+        return redirect(url_for('lab_requests'))
+    
+    return render_template("view_lab_request.html", request=lab_request, results=results)
+
+@app.route('/laboratory/request/<int:request_id>/process', methods=['GET', 'POST'])
+def process_lab_request(request_id):
+    if 'lab_user_id' not in session:
+        return redirect(url_for('laboratory_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    if request.method == 'POST':
+        # Update status to In Progress
+        cur.execute("""
+            UPDATE lab_requests 
+            SET status = 'In Progress', collected_date = ?, collected_by = ?
+            WHERE id = ?
+        """, (date.today().isoformat(), session['lab_full_name'], request_id))
+        conn.commit()
+        flash("Sample collected and test is now in progress", "success")
+        return redirect(url_for('enter_lab_results', request_id=request_id))
+    
+    # GET request - fetch the lab request
+    cur.execute("SELECT * FROM lab_requests WHERE id = ?", (request_id,))
+    lab_request = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if not lab_request:
+        flash("Lab request not found", "danger")
+        return redirect(url_for('lab_requests'))
+    
+    return render_template("process_lab_request.html", request=lab_request)
+
+@app.route('/laboratory/request/<int:request_id>/results', methods=['GET', 'POST'])
+def enter_lab_results(request_id):
+    if 'lab_user_id' not in session:
+        return redirect(url_for('laboratory_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    if request.method == 'POST':
+        # Save results for each test
+        for key, value in request.form.items():
+            if key.startswith('result_'):
+                test_id = key.split('_')[1]
+                result_value = value
+                interpretation = request.form.get(f'interpretation_{test_id}')
+                remarks = request.form.get(f'remarks_{test_id}')
+                
+                cur.execute("""
+                    INSERT OR REPLACE INTO lab_results (
+                        request_id, test_id, test_name, result_value, 
+                        interpretation, remarks, performed_by, performed_date
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (request_id, test_id, 
+                      request.form.get(f'test_name_{test_id}'),
+                      result_value, interpretation, remarks,
+                      session['lab_full_name'], date.today().isoformat()))
+        
+        # Update request status to Completed
+        cur.execute("""
+            UPDATE lab_requests 
+            SET status = 'Completed', completed_date = ?, completed_by = ?
+            WHERE id = ?
+        """, (date.today().isoformat(), session['lab_full_name'], request_id))
+        
+        conn.commit()
+        flash("Results saved and request marked as completed!", "success")
+        return redirect(url_for('lab_requests'))
+    
+    # GET request - fetch the lab request
+    cur.execute("SELECT * FROM lab_requests WHERE id = ?", (request_id,))
+    lab_request = cur.fetchone()
+    
+    if not lab_request:
+        flash("Lab request not found", "danger")
+        return redirect(url_for('lab_requests'))
+    
+    # Parse test IDs and names
+    test_ids = lab_request[7].split(',') if lab_request[7] else []
+    test_names = lab_request[8].split(',') if lab_request[8] else []
+    
+    # Get existing results
+    cur.execute("SELECT * FROM lab_results WHERE request_id = ?", (request_id,))
+    existing_results = {}
+    for row in cur.fetchall():
+        existing_results[str(row[2])] = row
+    
+    cur.close()
+    conn.close()
+    
+    return render_template("enter_lab_results.html", 
+                         request=lab_request, 
+                         test_ids=test_ids, 
+                         test_names=test_names,
+                         existing_results=existing_results)
+
+@app.route('/laboratory/reports')
+def lab_reports():
+    if 'lab_user_id' not in session:
+        return redirect(url_for('laboratory_login'))
+    
+    report_type = request.args.get('type', 'daily')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    month = request.args.get('month', date.today().month)
+    year = request.args.get('year', date.today().year)
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        if report_type == 'daily':
+            if not start_date:
+                start_date = date.today().isoformat()
+            
+            # Get stats
+            cur.execute("""
+                SELECT COUNT(*), COALESCE(SUM(grand_total), 0)
+                FROM lab_requests 
+                WHERE DATE(requested_date) = ? AND status = 'Completed'
+            """, (start_date,))
+            stats = cur.fetchone()
+            
+            # Get requests
+            cur.execute("""
+                SELECT id, request_no, patient_name, test_names, grand_total as amount, completed_date
+                FROM lab_requests 
+                WHERE DATE(requested_date) = ? AND status = 'Completed'
+                ORDER BY completed_date DESC
+            """, (start_date,))
+            lab_requests_list = cur.fetchall()
+            
+        else:  # monthly
+            # Get stats
+            cur.execute("""
+                SELECT COUNT(*), COALESCE(SUM(grand_total), 0)
+                FROM lab_requests 
+                WHERE strftime('%Y-%m', requested_date) = ? AND status = 'Completed'
+            """, (f"{year}-{int(month):02d}",))
+            stats = cur.fetchone()
+            
+            # Get requests
+            cur.execute("""
+                SELECT id, request_no, patient_name, test_names, grand_total as amount, requested_date
+                FROM lab_requests 
+                WHERE strftime('%Y-%m', requested_date) = ? AND status = 'Completed'
+                ORDER BY requested_date DESC
+            """, (f"{year}-{int(month):02d}",))
+            lab_requests_list = cur.fetchall()
+        
+        # Convert to list of dictionaries for easier template access
+        requests_data = []
+        for req in lab_requests_list:
+            requests_data.append({
+                'id': req[0],
+                'request_no': req[1],
+                'patient_name': req[2],
+                'test_names': req[3],
+                'amount': req[4],
+                'date': req[5]
+            })
+        
+    except Exception as e:
+        app.logger.error(f"Error generating lab reports: {e}")
+        stats = (0, 0)
+        requests_data = []
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template("lab_reports.html", 
+                         report_type=report_type,
+                         stats=stats,
+                         requests=requests_data,
+                         start_date=start_date,
+                         month=month,
+                         year=year)
+def create_default_hr_data():
+    """Insert default HR data into SQLite tables."""
+    conn = get_db_connection()
+    if not conn:
+        return
+    
+    cursor = conn.cursor()
+    
+    # Default password
+    default_password = 'hr@admin123'
+    hashed_password = generate_password_hash(default_password)
+    
+    # Insert or update default HR users
+    try:
+        # Check if hr_admin exists
+        cursor.execute("SELECT id, password FROM hr_users WHERE username = 'hr_admin'")
+        admin = cursor.fetchone()
+        
+        if admin:
+            # Check if password needs updating
+            try:
+                if not check_password_hash(admin[1], default_password):
+                    cursor.execute("UPDATE hr_users SET password = ? WHERE username = 'hr_admin'", (hashed_password,))
+                    print("Updated hr_admin password")
+            except (ValueError, TypeError):
+                cursor.execute("UPDATE hr_users SET password = ? WHERE username = 'hr_admin'", (hashed_password,))
+                print("Updated hr_admin password (was not hashed)")
+        else:
+            cursor.execute("""
+                INSERT INTO hr_users (username, password, full_name, email, role, is_active) 
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, ('hr_admin', hashed_password, 'HR Administrator', 'admin@hospital.com', 'HR Manager', 1))
+            print("Created hr_admin user")
+        
+        # Check if hr_staff exists
+        cursor.execute("SELECT id, password FROM hr_users WHERE username = 'hr_staff'")
+        staff = cursor.fetchone()
+        
+        if staff:
+            try:
+                if not check_password_hash(staff[1], default_password):
+                    cursor.execute("UPDATE hr_users SET password = ? WHERE username = 'hr_staff'", (hashed_password,))
+                    print("Updated hr_staff password")
+            except (ValueError, TypeError):
+                cursor.execute("UPDATE hr_users SET password = ? WHERE username = 'hr_staff'", (hashed_password,))
+                print("Updated hr_staff password (was not hashed)")
+        else:
+            cursor.execute("""
+                INSERT INTO hr_users (username, password, full_name, email, role, is_active) 
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, ('hr_staff', hashed_password, 'HR Staff', 'staff@hospital.com', 'HR Officer', 1))
+            print("Created hr_staff user")
+            
+    except Exception as e:
+        app.logger.error(f"Error inserting HR users: {e}")
+        print(f"HR users error: {e}")
+    
+    # Insert sample departments
+    departments = [
+        ('Administration', 'ADMIN', 'Hospital Administration and Management', 'Dr. John Smith'),
+        ('Medical', 'MED', 'Medical Services Department', 'Dr. Sarah Johnson'),
+        ('Nursing', 'NURS', 'Nursing Services', 'Mrs. Grace Williams'),
+        ('Pharmacy', 'PHARM', 'Pharmacy Department', 'Mr. Michael Brown'),
+        ('Laboratory', 'LAB', 'Laboratory Services', 'Dr. David Miller'),
+        ('Radiology', 'RAD', 'Radiology Department', 'Dr. Lisa Davis'),
+        ('Finance', 'FIN', 'Finance and Billing Department', 'Mr. Robert Wilson'),
+        ('Human Resources', 'HR', 'Human Resources Department', 'Ms. Patricia Taylor'),
+        ('Maintenance', 'MAINT', 'Facility Maintenance', 'Mr. Thomas Anderson'),
+        ('Security', 'SEC', 'Hospital Security', 'Mr. Richard Clark')
+    ]
+    
+    for dept in departments:
+        try:
+            cursor.execute("""
+                INSERT OR IGNORE INTO departments (name, code, description, head_of_dept, status) 
+                VALUES (?, ?, ?, ?, 'Active')
+            """, dept)
+        except Exception as e:
+            app.logger.error(f"Error inserting department {dept[0]}: {e}")
+    
+    # Get admin department ID for sample staff
+    cursor.execute("SELECT id FROM departments WHERE code = 'ADMIN' AND status = 'Active' LIMIT 1;")
+    admin_dept = cursor.fetchone()
+    
+    # Insert sample staff if departments exist
+    if admin_dept:
+        admin_dept_id = admin_dept[0]
+        sample_staff = [
+            ('EMP001', 'John', 'Doe', admin_dept_id, 'Hospital Administrator', 'Full-Time', 
+             'john.doe@hospital.com', '08012345678', '2022-01-15', 850000.00, 'Jane Doe - 08087654321', '123 Admin Street, Enugu'),
+            ('EMP002', 'Sarah', 'Johnson', admin_dept_id, 'Senior Doctor', 'Full-Time', 
+             'sarah.j@hospital.com', '08023456789', '2021-03-20', 1200000.00, 'Mark Johnson - 08098765432', '456 Medical Road, Enugu'),
+            ('EMP003', 'Michael', 'Brown', admin_dept_id, 'Chief Pharmacist', 'Full-Time', 
+             'michael.b@hospital.com', '08034567890', '2020-06-10', 950000.00, 'Emily Brown - 08076543210', '789 Pharmacy Lane, Enugu'),
+            ('EMP004', 'Grace', 'Williams', admin_dept_id, 'Head Nurse', 'Full-Time', 
+             'grace.w@hospital.com', '08045678901', '2019-08-05', 750000.00, 'James Williams - 08065432109', '321 Nursing Avenue, Enugu'),
+            ('EMP005', 'David', 'Miller', admin_dept_id, 'Lab Technician', 'Full-Time', 
+             'david.m@hospital.com', '08056789012', '2022-11-30', 650000.00, 'Sarah Miller - 08054321098', '654 Lab Street, Enugu')
+        ]
+        
+        for staff in sample_staff:
+            try:
+                cursor.execute("""
+                    INSERT OR IGNORE INTO staff (
+                        staff_id, first_name, last_name, department_id, position, 
+                        employment_type, email, phone, hire_date, salary, 
+                        emergency_contact, address, status
+                    ) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')
+                """, staff)
+            except Exception as e:
+                app.logger.error(f"Error inserting staff {staff[0]}: {e}")
+        
+        print(f"Inserted {len(sample_staff)} sample staff records")
+    
+    conn.commit()
+    
+    # Verify the data was inserted correctly
+    try:
+        cursor.execute("SELECT COUNT(*) FROM hr_users")
+        user_count = cursor.fetchone()[0]
+        print(f"Total HR users in database: {user_count}")
+        
+        cursor.execute("SELECT COUNT(*) FROM departments")
+        dept_count = cursor.fetchone()[0]
+        print(f"Total departments in database: {dept_count}")
+        
+        cursor.execute("SELECT COUNT(*) FROM staff")
+        staff_count = cursor.fetchone()[0]
+        print(f"Total staff in database: {staff_count}")
+        
+    except Exception as e:
+        app.logger.error(f"Error verifying data: {e}")
+    
+    cursor.close()
+    conn.close()
+    print("HR data initialization completed")
+        
+def create_sample_lab_tests():
+    """Insert sample lab tests into database."""
+    conn = get_db_connection()
+    if not conn:
+        return
+    
+    cursor = conn.cursor()
+    
+    sample_tests = [
+        ('CBC-001', 'Complete Blood Count', 'Hematology', 5000.00, 'Complete blood count test', 'No special preparation', 'Various', '2 hours'),
+        ('LFT-001', 'Liver Function Test', 'Biochemistry', 8000.00, 'Liver function test panel', 'Fasting required (8 hours)', 'Various', '4 hours'),
+        ('RFT-001', 'Renal Function Test', 'Biochemistry', 7000.00, 'Kidney function test', 'Fasting required (8 hours)', 'Various', '4 hours'),
+        ('LIP-001', 'Lipid Profile', 'Biochemistry', 6000.00, 'Cholesterol and lipids test', 'Fasting required (12 hours)', 'Various', '4 hours'),
+        ('U/A-001', 'Urinalysis', 'Urinalysis', 3000.00, 'Urine analysis', 'Clean catch mid-stream urine', 'Various', '1 hour'),
+        ('MP-001', 'Malaria Parasite', 'Microbiology', 2000.00, 'Malaria blood test', 'No special preparation', 'Negative', '1 hour'),
+        ('W/F-001', 'Widal Test', 'Microbiology', 4000.00, 'Typhoid fever test', 'No special preparation', 'Negative', '3 hours'),
+        ('HBsAg-001', 'Hepatitis B Surface Antigen', 'Immunology', 4500.00, 'Hepatitis B screening', 'No special preparation', 'Negative', '3 hours'),
+        ('HIV-001', 'HIV Test', 'Immunology', 3500.00, 'HIV screening test', 'No special preparation', 'Negative', '2 hours'),
+        ('HBA1C-001', 'HbA1c', 'Biochemistry', 5500.00, 'Diabetes monitoring test', 'No special preparation', '4-5.6%', '3 hours'),
+    ]
+    
+    for test in sample_tests:
+        try:
+            cursor.execute("""
+                INSERT OR IGNORE INTO lab_tests 
+                (test_id, test_name, category, price, description, preparation_instructions, normal_range, turnaround_time, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+            """, test)
+        except Exception as e:
+            app.logger.error(f"Error inserting test {test[0]}: {e}")
+    
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print("Sample lab tests added successfully!")
+
+# Call this function after create_tables() in your main block
+
+def update_lab_requests_table():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Check if grand_total column exists, if not add it
+        cur.execute("PRAGMA table_info(lab_requests)")
+        columns = [col[1] for col in cur.fetchall()]
+        
+        if 'grand_total' not in columns:
+            cur.execute("ALTER TABLE lab_requests ADD COLUMN grand_total DECIMAL(10, 2) DEFAULT 0")
+            print("Added grand_total column")
+        
+        if 'discount' not in columns:
+            cur.execute("ALTER TABLE lab_requests ADD COLUMN discount DECIMAL(10, 2) DEFAULT 0")
+            print("Added discount column")
+        
+        if 'amount_paid' not in columns:
+            cur.execute("ALTER TABLE lab_requests ADD COLUMN amount_paid DECIMAL(10, 2) DEFAULT 0")
+            print("Added amount_paid column")
+        
+        if 'balance' not in columns:
+            cur.execute("ALTER TABLE lab_requests ADD COLUMN balance DECIMAL(10, 2) DEFAULT 0")
+            print("Added balance column")
+        
+        # Update existing records - set grand_total = total_amount for old records
+        if 'grand_total' in columns and 'total_amount' in columns:
+            cur.execute("UPDATE lab_requests SET grand_total = total_amount WHERE grand_total IS NULL OR grand_total = 0")
+            print("Updated grand_total for existing records")
+        
+        conn.commit()
+        print("Lab requests table updated successfully!")
+        
+    except Exception as e:
+        print(f"Error updating table: {e}")
+        conn.rollback()
+    finally:
+        cur.close()
+        conn.close()
+
+# Call this function after create_tables() in your main block
+# if __name__ == "__main__":
+#     create_tables()
+#     create_default_users()
+#     create_default_hr_data()
+#     create_sample_lab_tests()
+#     update_lab_requests_table()  # Add this line
+#     app.run(debug=True)
+# @app.route('/laboratory/tests/<int:test_id>/view')
+# def view_lab_test(test_id):
+#     if 'lab_user_id' not in session:
+#         return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+#     conn = get_db_connection()
+#     cur = conn.cursor()
+    
+#     cur.execute("SELECT * FROM lab_tests WHERE id = ?", (test_id,))
+#     test = cur.fetchone()
+#     cur.close()
+#     conn.close()
+    
+#     if test:
+#         return jsonify({
+#             "success": True,
+#             "test": {
+#                 "id": test[0],
+#                 "test_id": test[1],
+#                 "test_name": test[2],
+#                 "category": test[3],
+#                 "price": test[4],
+#                 "description": test[5],
+#                 "preparation_instructions": test[6],
+#                 "normal_range": test[7],
+#                 "turnaround_time": test[8],
+#                 "is_active": test[9]
+#             }
+#         })
+#     else:
+#         return jsonify({"success": False, "message": "Test not found"}), 404
+
+# @app.route('/laboratory/tests/<int:test_id>/edit', methods=['POST'])
+# def edit_lab_test(test_id):
+#     if 'lab_user_id' not in session:
+#         return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+#     data = request.get_json()
+    
+#     conn = get_db_connection()
+#     cur = conn.cursor()
+    
+#     try:
+#         cur.execute("""
+#             UPDATE lab_tests 
+#             SET test_name = ?,
+#                 category = ?,
+#                 price = ?,
+#                 description = ?,
+#                 preparation_instructions = ?,
+#                 normal_range = ?,
+#                 turnaround_time = ?
+#             WHERE id = ?
+#         """, (data['test_name'], data['category'], data['price'], 
+#               data['description'], data['preparation_instructions'],
+#               data['normal_range'], data['turnaround_time'], test_id))
+        
+#         conn.commit()
+#         return jsonify({"success": True, "message": "Test updated successfully"})
+        
+#     except Exception as e:
+#         conn.rollback()
+#         return jsonify({"success": False, "message": str(e)}), 500
+#     finally:
+#         cur.close()
+#         conn.close()
+
+# @app.route('/laboratory/tests/<int:test_id>/toggle-status', methods=['POST'])
+# def toggle_lab_test_status(test_id):
+#     if 'lab_user_id' not in session:
+#         return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+#     data = request.get_json()
+#     is_active = data.get('is_active', 0)
+    
+#     conn = get_db_connection()
+#     cur = conn.cursor()
+    
+#     try:
+#         cur.execute("UPDATE lab_tests SET is_active = ? WHERE id = ?", (is_active, test_id))
+#         conn.commit()
+#         return jsonify({"success": True, "message": "Status updated successfully"})
+        
+#     except Exception as e:
+#         conn.rollback()
+#         return jsonify({"success": False, "message": str(e)}), 500
+#     finally:
+#         cur.close()
+#         conn.close()
+        
+        
+@app.route('/laboratory/tests/<int:test_id>/view')
+def view_lab_test(test_id):
+    if 'lab_user_id' not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute("SELECT * FROM lab_tests WHERE id = ?", (test_id,))
+        test = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        if test:
+            # Convert to dictionary for JSON response
+            return jsonify({
+                "success": True,
+                "test": {
+                    "id": test[0],
+                    "test_id": test[1],
+                    "test_name": test[2],
+                    "category": test[3],
+                    "price": test[4],
+                    "description": test[5] or '',
+                    "preparation_instructions": test[6] or '',
+                    "normal_range": test[7] or '',
+                    "turnaround_time": test[8] or '',
+                    "is_active": test[9]
+                }
+            })
+        else:
+            return jsonify({"success": False, "message": "Test not found"}), 404
+    except Exception as e:
+        app.logger.error(f"Error viewing test: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/laboratory/tests/<int:test_id>/edit', methods=['POST'])
+def edit_lab_test(test_id):
+    if 'lab_user_id' not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute("""
+            UPDATE lab_tests 
+            SET test_name = ?,
+                category = ?,
+                price = ?,
+                description = ?,
+                preparation_instructions = ?,
+                normal_range = ?,
+                turnaround_time = ?
+            WHERE id = ?
+        """, (data.get('test_name'), data.get('category'), data.get('price'), 
+              data.get('description', ''), data.get('preparation_instructions', ''),
+              data.get('normal_range', ''), data.get('turnaround_time', ''), test_id))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({"success": True, "message": "Test updated successfully"})
+        
+    except Exception as e:
+        app.logger.error(f"Error editing test: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/laboratory/tests/<int:test_id>/toggle-status', methods=['POST'])
+def toggle_lab_test_status(test_id):
+    if 'lab_user_id' not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        is_active = data.get('is_active', 0)
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute("UPDATE lab_tests SET is_active = ? WHERE id = ?", (is_active, test_id))
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        status_text = "activated" if is_active == 1 else "deactivated"
+        return jsonify({"success": True, "message": f"Test {status_text} successfully"})
+        
+    except Exception as e:
+        app.logger.error(f"Error toggling test status: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500   
+    
+# -------------------- ROUTES: PATIENT SERVICES MODULE --------------------
+
+# 
+
+# @app.route('/patient_services/dashboard')
+# def patient_services_dashboard():
+#     if 'patient_user_id' not in session:
+#         return redirect(url_for('patient_services_login'))
+    
+#     conn = get_db_connection()
+#     cur = conn.cursor()
+    
+#     try:
+#         # Today's statistics
+#         today = date.today().isoformat()
+        
+#         cur.execute("SELECT COUNT(*) FROM patients WHERE registration_date = ?", (today,))
+#         today_registrations = cur.fetchone()[0] or 0
+        
+#         cur.execute("SELECT COUNT(*) FROM appointments WHERE appointment_date = ? AND status = 'Scheduled'", (today,))
+#         today_appointments = cur.fetchone()[0] or 0
+        
+#         cur.execute("SELECT COUNT(*) FROM queue WHERE status = 'Waiting'")
+#         waiting_queue = cur.fetchone()[0] or 0
+        
+#         cur.execute("SELECT COUNT(*) FROM patient_services WHERE DATE(check_in_time) = ? AND status = 'Active'", (today,))
+#         active_services = cur.fetchone()[0] or 0
+        
+#         # Current queue
+#         cur.execute("""
+#             SELECT id, token_no, patient_name, service_type, priority, queue_position, created_at
+#             FROM queue 
+#             WHERE status = 'Waiting'
+#             ORDER BY queue_position ASC
+#             LIMIT 10
+#         """)
+#         current_queue = cur.fetchall()
+        
+#     except Exception as e:
+#         app.logger.error(f"Error loading patient dashboard: {e}")
+#         today_registrations = today_appointments = waiting_queue = active_services = 0
+#         current_queue = []
+    
+#     finally:
+#         cur.close()
+#         conn.close()
+    
+#     return render_template("patient_services/dashboard.html",
+#                          today_registrations=today_registrations,
+#                          today_appointments=today_appointments,
+#                          waiting_queue=waiting_queue,
+#                          active_services=active_services,
+#                          current_queue=current_queue,
+#                          user_name=session.get('patient_full_name'))
+
+# @app.route('/patient_services/logout')
+# def patient_services_logout():
+#     session.pop('patient_user_id', None)
+#     session.pop('patient_username', None)
+#     session.pop('patient_full_name', None)
+#     session.pop('patient_role', None)
+#     flash("Logged out successfully", "success")
+#     return redirect(url_for('patient_services_login'))
+
+# ==================== PATIENT REGISTRATION ====================
+
+@app.route('/patient_services/patients/register', methods=['GET', 'POST'])
+def register_patient():
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    if request.method == 'POST':
+        # Get form data
+        first_name = request.form.get('first_name')
+        last_name = request.form.get('last_name')
+        date_of_birth = request.form.get('date_of_birth')
+        gender = request.form.get('gender')
+        blood_group = request.form.get('blood_group')
+        genotype = request.form.get('genotype')
+        phone = request.form.get('phone')
+        email = request.form.get('email')
+        address = request.form.get('address')
+        emergency_contact_name = request.form.get('emergency_contact_name')
+        emergency_contact_phone = request.form.get('emergency_contact_phone')
+        occupation = request.form.get('occupation')
+        marital_status = request.form.get('marital_status')
+        nationality = request.form.get('nationality')
+        religion = request.form.get('religion')
+        next_of_kin = request.form.get('next_of_kin')
+        next_of_kin_phone = request.form.get('next_of_kin_phone')
+        notes = request.form.get('notes')
+        
+        # Validate required fields
+        if not all([first_name, last_name, date_of_birth, gender]):
+            flash("Please fill in all required fields", "danger")
+            return redirect(url_for('register_patient'))
+        
+        # Generate unique IDs
+        import random
+        patient_id = f"PT-{datetime.now().strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
+        hospital_no = f"HN-{datetime.now().strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
+        
+        # Generate sequential card number
+        card_number = generate_card_number()
+        
+        # Handle empty values - convert empty strings to None
+        blood_group = blood_group if blood_group and blood_group != '' else None
+        genotype = genotype if genotype and genotype != '' else None
+        phone = phone if phone and phone != '' else None
+        email = email if email and email != '' else None
+        address = address if address and address != '' else None
+        emergency_contact_name = emergency_contact_name if emergency_contact_name and emergency_contact_name != '' else None
+        emergency_contact_phone = emergency_contact_phone if emergency_contact_phone and emergency_contact_phone != '' else None
+        occupation = occupation if occupation and occupation != '' else None
+        marital_status = marital_status if marital_status and marital_status != '' else None
+        nationality = nationality if nationality and nationality != '' else 'Nigerian'
+        religion = religion if religion and religion != '' else None
+        next_of_kin = next_of_kin if next_of_kin and next_of_kin != '' else None
+        next_of_kin_phone = next_of_kin_phone if next_of_kin_phone and next_of_kin_phone != '' else None
+        notes = notes if notes and notes != '' else None
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        try:
+            cur.execute("""
+                INSERT INTO patients (
+                    patient_id, hospital_no, card_number, first_name, last_name, date_of_birth, gender,
+                    blood_group, genotype, phone, email, address, emergency_contact_name,
+                    emergency_contact_phone, occupation, marital_status, nationality, religion,
+                    next_of_kin, next_of_kin_phone, registration_date, registration_time, notes, created_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (patient_id, hospital_no, card_number, first_name, last_name, date_of_birth, gender,
+                  blood_group, genotype, phone, email, address, emergency_contact_name,
+                  emergency_contact_phone, occupation, marital_status, nationality, religion,
+                  next_of_kin, next_of_kin_phone, date.today().isoformat(), 
+                  datetime.now().strftime('%H:%M:%S'), notes, session['patient_user_id']))
+            
+            conn.commit()
+            patient_db_id = cur.lastrowid
+            
+            flash(f"Patient {first_name} {last_name} registered successfully! Card Number: {card_number}", "success")
+            return redirect(url_for('view_patient', patient_id=patient_db_id))
+            
+        except Exception as e:
+            conn.rollback()
+            app.logger.error(f"Error registering patient: {e}")
+            flash(f"Error registering patient: {str(e)}", "danger")
+            return redirect(url_for('register_patient'))
+        finally:
+            cur.close()
+            conn.close()
+    
+    # GET request - show form
+    # Import date here to avoid conflict with variable name
+    from datetime import date as date_today
+    current_date = date_today.today()
+    max_date = current_date.isoformat()
+    
+    return render_template("patient_services/register_patient.html", 
+                         current_date=current_date,
+                         max_date=max_date)
+
+
+@app.route('/patient_services/patients/search')
+def search_patients():
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    search_term = request.args.get('q', '')
+    show_deleted = request.args.get('show_deleted', '0')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Build the query with status filter
+    query = """
+        SELECT 
+            p.id, 
+            p.patient_id, 
+            p.hospital_no, 
+            p.card_number, 
+            p.first_name, 
+            p.last_name, 
+            p.phone, 
+            p.registration_date,
+            p.status,
+            p.blood_group,
+            p.date_of_birth,
+            p.gender,
+            p.email,
+            p.address
+        FROM patients p
+        WHERE 1=1
+    """
+    params = []
+    
+    # Filter by deleted status
+    if show_deleted != '1':
+        query += " AND p.status != 'Deleted'"
+    
+    # Search term filter
+    if search_term:
+        query += """ AND (p.first_name LIKE ? OR p.last_name LIKE ? 
+                   OR p.patient_id LIKE ? OR p.phone LIKE ? 
+                   OR p.hospital_no LIKE ? OR p.card_number LIKE ?)"""
+        search_pattern = f'%{search_term}%'
+        params.extend([search_pattern, search_pattern, search_pattern, 
+                      search_pattern, search_pattern, search_pattern])
+    
+    query += " ORDER BY p.first_name, p.last_name LIMIT 100"
+    
+    cur.execute(query, params)
+    patients = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    # Convert to list of dicts for easier template access
+    patients_list = []
+    for patient in patients:
+        patients_list.append({
+            'id': patient[0],
+            'patient_id': patient[1],
+            'hospital_no': patient[2],
+            'card_number': patient[3],
+            'first_name': patient[4],
+            'last_name': patient[5],
+            'phone': patient[6],
+            'registration_date': patient[7],
+            'status': patient[8] if len(patient) > 8 else 'Active',
+            'blood_group': patient[9] if len(patient) > 9 else None,
+            'date_of_birth': patient[10] if len(patient) > 10 else None,
+            'gender': patient[11] if len(patient) > 11 else None,
+            'email': patient[12] if len(patient) > 12 else None,
+            'address': patient[13] if len(patient) > 13 else None
+        })
+    
+    return render_template("patient_services/search_patients.html",
+                         patients=patients_list,
+                         search_term=search_term,
+                         show_deleted=show_deleted)
+    
+    
+@app.route('/api/patient/<int:patient_id>/card-number')
+def api_patient_card_number(patient_id):
+    """API endpoint to get patient card number"""
+    if 'patient_user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT card_number FROM patients WHERE id = ?", (patient_id,))
+    result = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if result:
+        return jsonify({"card_number": result[0]})
+    else:
+        return jsonify({"card_number": None})
+    
+    
+        
+    
+@app.route('/patient_services/patients/<int:patient_id>')
+def view_patient(patient_id):
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("SELECT * FROM patients WHERE id = ?", (patient_id,))
+    patient = cur.fetchone()
+    
+    # Get patient's appointments
+    cur.execute("""
+        SELECT * FROM appointments 
+        WHERE patient_id = ? 
+        ORDER BY appointment_date DESC, appointment_time DESC
+        LIMIT 10
+    """, (patient_id,))
+    appointments = cur.fetchall()
+    
+    # Get patient's queue history
+    cur.execute("""
+        SELECT * FROM queue 
+        WHERE patient_id = ? 
+        ORDER BY created_at DESC
+        LIMIT 10
+    """, (patient_id,))
+    queue_history = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    
+    if not patient:
+        flash("Patient not found", "danger")
+        return redirect(url_for('search_patients'))
+    
+    return render_template("patient_services/view_patient.html", 
+                         patient=patient, 
+                         appointments=appointments,
+                         queue_history=queue_history)
+
+@app.route('/patient_services/patients/<int:patient_id>/edit', methods=['GET', 'POST'])
+def edit_patient(patient_id):
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    if request.method == 'POST':
+        # Update patient data
+        first_name = request.form.get('first_name')
+        last_name = request.form.get('last_name')
+        date_of_birth = request.form.get('date_of_birth')
+        gender = request.form.get('gender')
+        blood_group = request.form.get('blood_group')
+        genotype = request.form.get('genotype')
+        phone = request.form.get('phone')
+        email = request.form.get('email')
+        address = request.form.get('address')
+        emergency_contact_name = request.form.get('emergency_contact_name')
+        emergency_contact_phone = request.form.get('emergency_contact_phone')
+        occupation = request.form.get('occupation')
+        marital_status = request.form.get('marital_status')
+        nationality = request.form.get('nationality')
+        religion = request.form.get('religion')
+        next_of_kin = request.form.get('next_of_kin')
+        next_of_kin_phone = request.form.get('next_of_kin_phone')
+        notes = request.form.get('notes')
+        
+        try:
+            cur.execute("""
+                UPDATE patients SET
+                    first_name = ?, last_name = ?, date_of_birth = ?, gender = ?,
+                    blood_group = ?, genotype = ?, phone = ?, email = ?, address = ?,
+                    emergency_contact_name = ?, emergency_contact_phone = ?, occupation = ?,
+                    marital_status = ?, nationality = ?, religion = ?, next_of_kin = ?,
+                    next_of_kin_phone = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (first_name, last_name, date_of_birth, gender, blood_group, genotype,
+                  phone, email, address, emergency_contact_name, emergency_contact_phone,
+                  occupation, marital_status, nationality, religion, next_of_kin,
+                  next_of_kin_phone, notes, patient_id))
+            
+            conn.commit()
+            flash("Patient information updated successfully!", "success")
+            return redirect(url_for('view_patient', patient_id=patient_id))
+            
+        except Exception as e:
+            conn.rollback()
+            flash(f"Error updating patient: {str(e)}", "danger")
+    
+    # GET request - show form
+    cur.execute("SELECT * FROM patients WHERE id = ?", (patient_id,))
+    patient = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if not patient:
+        flash("Patient not found", "danger")
+        return redirect(url_for('search_patients'))
+    
+    return render_template("patient_services/edit_patient.html", patient=patient)
+
+# ==================== APPOINTMENTS ====================
+
+@app.route('/patient_services/appointments/book', methods=['GET', 'POST'])
+def book_appointment():
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    if request.method == 'POST':
+        patient_id = request.form.get('patient_id')
+        doctor_name = request.form.get('doctor_name')
+        department = request.form.get('department')
+        appointment_date = request.form.get('appointment_date')
+        appointment_time = request.form.get('appointment_time')
+        purpose = request.form.get('purpose')
+        priority = request.form.get('priority', 'Normal')
+        notes = request.form.get('notes')
+        
+        # Get patient name
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT first_name, last_name FROM patients WHERE id = ?", (patient_id,))
+        patient = cur.fetchone()
+        
+        if not patient:
+            flash("Patient not found", "danger")
+            return redirect(url_for('book_appointment'))
+        
+        patient_name = f"{patient[0]} {patient[1]}"
+        appointment_no = f"APT-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
+        
+        try:
+            cur.execute("""
+                INSERT INTO appointments (
+                    appointment_no, patient_id, patient_name, doctor_name, department,
+                    appointment_date, appointment_time, purpose, priority, notes, created_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (appointment_no, patient_id, patient_name, doctor_name, department,
+                  appointment_date, appointment_time, purpose, priority, notes, session['patient_user_id']))
+            
+            conn.commit()
+            flash(f"Appointment booked successfully! No: {appointment_no}", "success")
+            return redirect(url_for('view_appointments'))
+            
+        except Exception as e:
+            conn.rollback()
+            flash(f"Error booking appointment: {str(e)}", "danger")
+        finally:
+            cur.close()
+            conn.close()
+    
+    return render_template("patient_services/book_appointment.html")
+
+@app.route('/patient_services/appointments')
+def view_appointments():
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    date_filter = request.args.get('date', date.today().isoformat())
+    status_filter = request.args.get('status', '')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    query = """
+        SELECT * FROM appointments 
+        WHERE appointment_date = ?
+    """
+    params = [date_filter]
+    
+    if status_filter:
+        query += " AND status = ?"
+        params.append(status_filter)
+    
+    query += " ORDER BY appointment_time"
+    
+    cur.execute(query, params)
+    appointments = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return render_template("patient_services/appointments.html", 
+                         appointments=appointments, 
+                         date_filter=date_filter,
+                         status_filter=status_filter)
+
+@app.route('/patient_services/appointments/<int:appointment_id>/cancel', methods=['POST'])
+def cancel_appointment(appointment_id):
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("UPDATE appointments SET status = 'Cancelled' WHERE id = ?", (appointment_id,))
+        conn.commit()
+        flash("Appointment cancelled successfully", "success")
+    except Exception as e:
+        flash(f"Error cancelling appointment: {str(e)}", "danger")
+    finally:
+        cur.close()
+        conn.close()
+    
+    return redirect(url_for('view_appointments'))
+
+# ==================== QUEUE MANAGEMENT ====================
+
+@app.route('/patient_services/queue/generate', methods=['POST'])
+def generate_queue_token():
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    patient_id = request.form.get('patient_id')
+    service_type = request.form.get('service_type')
+    priority = request.form.get('priority', 'Normal')
+    notes = request.form.get('notes')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Get patient name
+    cur.execute("SELECT first_name, last_name FROM patients WHERE id = ?", (patient_id,))
+    patient = cur.fetchone()
+    
+    if not patient:
+        flash("Patient not found", "danger")
+        return redirect(url_for('search_patients'))
+    
+    patient_name = f"{patient[0]} {patient[1]}"
+    
+    # Get next queue position
+    cur.execute("SELECT COUNT(*) FROM queue WHERE status = 'Waiting'")
+    queue_count = cur.fetchone()[0] or 0
+    queue_position = queue_count + 1
+    
+    token_no = f"TK-{datetime.now().strftime('%Y%m%d')}-{queue_position:03d}"
+    
+    try:
+        cur.execute("""
+            INSERT INTO queue (
+                token_no, patient_id, patient_name, service_type, priority,
+                queue_position, status, notes, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, 'Waiting', ?, CURRENT_TIMESTAMP)
+        """, (token_no, patient_id, patient_name, service_type, priority, queue_position, notes))
+        
+        conn.commit()
+        flash(f"Queue token generated: {token_no} (Position: {queue_position})", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"Error generating token: {str(e)}", "danger")
+    finally:
+        cur.close()
+        conn.close()
+    
+    return redirect(url_for('view_queue'))
+
+@app.route('/patient_services/queue')
+def view_queue():
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT * FROM queue 
+        WHERE status = 'Waiting'
+        ORDER BY 
+            CASE priority WHEN 'High' THEN 1 WHEN 'Normal' THEN 2 ELSE 3 END,
+            queue_position ASC
+    """)
+    waiting_queue = cur.fetchall()
+    
+    cur.execute("""
+        SELECT * FROM queue 
+        WHERE status IN ('Called', 'In Progress')
+        ORDER BY called_at DESC
+        LIMIT 10
+    """)
+    active_calls = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    
+    return render_template("patient_services/queue.html", 
+                         waiting_queue=waiting_queue,
+                         active_calls=active_calls)
+
+@app.route('/patient_services/queue/<int:queue_id>/call', methods=['POST'])
+def call_patient(queue_id):
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            UPDATE queue 
+            SET status = 'Called', 
+                called_at = CURRENT_TIMESTAMP, 
+                called_by = ?
+            WHERE id = ?
+        """, (session['patient_full_name'], queue_id))
+        conn.commit()
+        flash("Patient called successfully", "success")
+    except Exception as e:
+        flash(f"Error calling patient: {str(e)}", "danger")
+    finally:
+        cur.close()
+        conn.close()
+    
+    return redirect(url_for('view_queue'))
+
+# ==================== PATIENT SERVICES ====================
+
+@app.route('/patient_services/checkin', methods=['GET', 'POST'])
+def patient_checkin():
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    if request.method == 'POST':
+        patient_id = request.form.get('patient_id')
+        service_type = request.form.get('service_type')
+        is_emergency = request.form.get('is_emergency', '0')
+        ward_requested = request.form.get('ward_requested', '0')
+        ward_type = request.form.get('ward_type') if ward_requested == '1' else None
+        notes = request.form.get('notes')
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Get patient name
+        cur.execute("SELECT first_name, last_name FROM patients WHERE id = ?", (patient_id,))
+        patient = cur.fetchone()
+        
+        if not patient:
+            flash("Patient not found", "danger")
+            return redirect(url_for('patient_checkin'))
+        
+        patient_name = f"{patient[0]} {patient[1]}"
+        service_no = f"SVC-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
+        
+        try:
+            cur.execute("""
+                INSERT INTO patient_services (
+                    service_no, patient_id, patient_name, service_type, check_in_time,
+                    is_emergency, ward_requested, ward_type, notes, created_by
+                ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?)
+            """, (service_no, patient_id, patient_name, service_type, 
+                  is_emergency, ward_requested, ward_type, notes, session['patient_user_id']))
+            
+            conn.commit()
+            flash(f"Patient checked in successfully! Service No: {service_no}", "success")
+            
+            # Also generate queue token
+            if service_type:
+                # Get next queue position
+                cur.execute("SELECT COUNT(*) FROM queue WHERE status = 'Waiting'")
+                queue_count = cur.fetchone()[0] or 0
+                queue_position = queue_count + 1
+                token_no = f"TK-{datetime.now().strftime('%Y%m%d')}-{queue_position:03d}"
+                
+                cur.execute("""
+                    INSERT INTO queue (
+                        token_no, patient_id, patient_name, service_type, priority,
+                        queue_position, status, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, 'Waiting', CURRENT_TIMESTAMP)
+                """, (token_no, patient_id, patient_name, service_type, 
+                      'High' if is_emergency == '1' else 'Normal', queue_position))
+                conn.commit()
+                flash(f"Queue token generated: {token_no} (Position: {queue_position})", "success")
+            
+        except Exception as e:
+            conn.rollback()
+            flash(f"Error during check-in: {str(e)}", "danger")
+        finally:
+            cur.close()
+            conn.close()
+        
+        return redirect(url_for('active_services'))
+    
+    return render_template("patient_services/checkin.html")
+
+@app.route('/patient_services/services/active')
+def active_services():
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT * FROM patient_services 
+        WHERE status = 'Active'
+        ORDER BY check_in_time DESC
+    """)
+    services = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return render_template("patient_services/active_services.html", services=services)
+
+# ==================== REPORTS ====================
+
+@app.route('/patient_services/reports/daily')
+def daily_registration_report():
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    # Fix: Don't use 'date' as variable name since it conflicts with the date module
+    from datetime import date as date_today
+    
+    report_date_str = request.args.get('date', date_today.today().isoformat())
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT COUNT(*)
+        FROM patients 
+        WHERE registration_date = ?
+    """, (report_date_str,))
+    total_registrations = cur.fetchone()[0] or 0
+    
+    cur.execute("""
+        SELECT * FROM patients 
+        WHERE registration_date = ?
+        ORDER BY registration_time DESC
+    """, (report_date_str,))
+    patients = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    
+    return render_template("patient_services/daily_report.html", 
+                         date=report_date_str, 
+                         total_registrations=total_registrations,
+                         patients=patients)
+        
+ 
+ # -------------------- ROUTES: PATIENT SERVICES MODULE --------------------
+
+
+@app.route('/patient_services/login', methods=['GET', 'POST'])
+def patient_services_login():
+    if 'patient_user_id' in session:
+        return redirect(url_for('patient_services_dashboard'))
+
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM patient_users WHERE username = ? AND is_active = 1", (username,))
+        user = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if user and check_password_hash(user['password'], password):
+            session['patient_user_id'] = user['id']
+            session['patient_username'] = user['username']
+            session['patient_full_name'] = user['full_name']
+            session['patient_role'] = user['role']
+            flash("Login successful!", "success")
+            return redirect(url_for('patient_services_dashboard'))
+        else:
+            flash("Invalid username or password.", "danger")
+
+    return render_template("patient_services/login.html")
+
+@app.route('/patient_services/dashboard')
+def patient_services_dashboard():
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    return render_template("patient_services/dashboard.html",
+                         today_registrations=0,
+                         today_appointments=0,
+                         waiting_queue=0,
+                         active_services=0,
+                         current_queue=[],
+                         user_name=session.get('patient_full_name', 'User'))
+
+@app.route('/patient_services/logout')
+def patient_services_logout():
+    session.pop('patient_user_id', None)
+    session.pop('patient_username', None)
+    session.pop('patient_full_name', None)
+    session.pop('patient_role', None)
+    flash("Logged out successfully", "success")
+    return redirect(url_for('patient_services_login'))   
+
+def generate_card_number():
+    """Generate sequential card number in format JTSSH-XXXXXX"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Check if card_number column exists
+        cur.execute("PRAGMA table_info(patients)")
+        columns = [col[1] for col in cur.fetchall()]
+        
+        if 'card_number' not in columns:
+            # Column doesn't exist yet, add it without UNIQUE constraint
+            cur.execute("ALTER TABLE patients ADD COLUMN card_number VARCHAR(50)")
+            conn.commit()
+            print("Added card_number column")
+        
+        # Get the highest card number
+        cur.execute("""
+            SELECT card_number FROM patients 
+            WHERE card_number IS NOT NULL AND card_number LIKE 'JTSSH-%'
+            ORDER BY id DESC 
+            LIMIT 1
+        """)
+        
+        last_card = cur.fetchone()
+        
+        if last_card and last_card[0]:
+            # Extract the number part (e.g., from 'JTSSH-000001' get '000001')
+            try:
+                last_num = int(last_card[0].split('-')[1])
+                next_num = last_num + 1
+            except (ValueError, IndexError):
+                next_num = 1
+        else:
+            # Count existing patients to determine next number
+            cur.execute("SELECT COUNT(*) FROM patients")
+            count = cur.fetchone()[0] or 0
+            next_num = count + 1
+        
+        # Format with leading zeros (6 digits)
+        return f"JTSSH-{next_num:06d}"
+        
+    except Exception as e:
+        print(f"Error generating card number: {e}")
+        # Fallback: use timestamp-based number
+        import time
+        return f"JTSSH-{int(time.time()) % 1000000:06d}"
+    finally:
+        cur.close()
+        conn.close()
+
+def add_card_number_column_and_backfill():
+    """Add card_number column to patients table and backfill existing records"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Check if column exists
+        cur.execute("PRAGMA table_info(patients)")
+        columns = [col[1] for col in cur.fetchall()]
+        
+        if 'card_number' not in columns:
+            # Add the column
+            cur.execute("ALTER TABLE patients ADD COLUMN card_number VARCHAR(50) UNIQUE")
+            print("Added card_number column")
+            
+            # Backfill existing patients with sequential card numbers
+            cur.execute("SELECT id FROM patients ORDER BY id")
+            patients = cur.fetchall()
+            
+            for index, patient in enumerate(patients, start=1):
+                card_number = f"JTSSH-{index:06d}"
+                cur.execute("UPDATE patients SET card_number = ? WHERE id = ?", (card_number, patient[0]))
+            
+            conn.commit()
+            print(f"Backfilled {len(patients)} patients with card numbers")
+        else:
+            print("card_number column already exists")
+            
+    except Exception as e:
+        print(f"Error updating table: {e}")
+        conn.rollback()
+    finally:
+        cur.close()
+        conn.close()
+        
+def add_card_number_column():
+    """Add card_number column to patients table if it doesn't exist"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Check if column exists
+        cur.execute("PRAGMA table_info(patients)")
+        columns = [col[1] for col in cur.fetchall()]
+        
+        if 'card_number' not in columns:
+            # Add the column
+            cur.execute("ALTER TABLE patients ADD COLUMN card_number VARCHAR(50) UNIQUE")
+            print("✓ Added card_number column to patients table")
+            
+            # Backfill existing patients with sequential card numbers
+            cur.execute("SELECT id FROM patients ORDER BY id")
+            patients = cur.fetchall()
+            
+            for index, patient in enumerate(patients, start=1):
+                card_number = f"JTSSH-{index:06d}"
+                cur.execute("UPDATE patients SET card_number = ? WHERE id = ?", (card_number, patient[0]))
+            
+            conn.commit()
+            print(f"✓ Backfilled {len(patients)} patients with card numbers")
+        else:
+            print("✓ card_number column already exists")
+            
+    except Exception as e:
+        print(f"Error adding card_number column: {e}")
+        conn.rollback()
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ==================== DELETE PATIENT (WITH SOFT DELETE) ====================
+
+@app.route('/patient_services/patients/<int:patient_id>/delete', methods=['POST'])
+def delete_patient(patient_id):
+    """Delete a patient (soft delete by setting status to 'Deleted')"""
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    # Optional: Check if user has permission to delete (e.g., only admins or managers)
+    # You can uncomment this if you want to restrict deletion to specific roles
+    # if session.get('patient_role') not in ['Manager', 'Admin']:
+    #     flash("You don't have permission to delete patients", "danger")
+    #     return redirect(url_for('search_patients'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # First, get patient info for confirmation message
+        cur.execute("SELECT first_name, last_name, patient_id FROM patients WHERE id = ?", (patient_id,))
+        patient = cur.fetchone()
+        
+        if not patient:
+            flash("Patient not found", "danger")
+            return redirect(url_for('search_patients'))
+        
+        # Check if patient has any active appointments or services
+        cur.execute("""
+            SELECT COUNT(*) FROM appointments 
+            WHERE patient_id = ? AND status IN ('Scheduled', 'Confirmed')
+        """, (patient_id,))
+        active_appointments = cur.fetchone()[0] or 0
+        
+        cur.execute("""
+            SELECT COUNT(*) FROM patient_services 
+            WHERE patient_id = ? AND status = 'Active'
+        """, (patient_id,))
+        active_services = cur.fetchone()[0] or 0
+        
+        # Option 1: Soft delete - just mark as deleted (Recommended)
+        cur.execute("""
+            UPDATE patients 
+            SET status = 'Deleted', 
+                updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ?
+        """, (patient_id,))
+        
+        # Option 2: Hard delete - permanently remove (Uncomment if you want this instead)
+        # cur.execute("DELETE FROM patients WHERE id = ?", (patient_id,))
+        
+        conn.commit()
+        
+        patient_name = f"{patient[0]} {patient[1]}"
+        
+        # Show warning if there were active appointments/services
+        warning_msg = ""
+        if active_appointments > 0 or active_services > 0:
+            warning_msg = f" Note: This patient had {active_appointments} active appointment(s) and {active_services} active service(s)."
+        
+        flash(f"Patient {patient_name} (ID: {patient[2]}) has been deleted successfully.{warning_msg}", "success")
+        
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f"Error deleting patient {patient_id}: {e}")
+        flash(f"Error deleting patient: {str(e)}", "danger")
+    finally:
+        cur.close()
+        conn.close()
+    
+    # Redirect back to the referring page or search page
+    referrer = request.referrer
+    if referrer and 'view_patient' in referrer:
+        return redirect(url_for('search_patients'))
+    return redirect(request.referrer or url_for('search_patients'))
+
+
+@app.route('/patient_services/patients/<int:patient_id>/restore', methods=['POST'])
+def restore_patient(patient_id):
+    """Restore a soft-deleted patient"""
+    if 'patient_user_id' not in session:
+        return redirect(url_for('patient_services_login'))
+    
+    # Optional: Check permission
+    # if session.get('patient_role') not in ['Manager', 'Admin']:
+    #     flash("You don't have permission to restore patients", "danger")
+    #     return redirect(url_for('search_patients'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            UPDATE patients 
+            SET status = 'Active', 
+                updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ? AND status = 'Deleted'
+        """, (patient_id,))
+        
+        if cur.rowcount > 0:
+            conn.commit()
+            flash("Patient restored successfully", "success")
+        else:
+            flash("Patient not found or not deleted", "warning")
+            
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f"Error restoring patient {patient_id}: {e}")
+        flash(f"Error restoring patient: {str(e)}", "danger")
+    finally:
+        cur.close()
+        conn.close()
+    
+    return redirect(request.referrer or url_for('search_patients'))
+
+@app.route('/api/next-card-number')
+def api_next_card_number():
+    """API endpoint to get the next card number"""
+    if 'patient_user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    next_card = generate_card_number()
+    return jsonify({"card_number": next_card})
+
+
+# ==================== CLINICAL/DOCTOR MODULE ====================
+
+@app.route('/clinical/login', methods=['GET', 'POST'])
+def clinical_login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        # Simple hardcoded check for testing
+        if username == 'doctor1' and password == 'doctor123':
+            session['clinical_user_id'] = 1
+            session['clinical_username'] = 'doctor1'
+            session['clinical_name'] = 'Dr. John Smith'
+            session['clinical_specialization'] = 'General Medicine'
+            flash("Welcome, Dr. John Smith!", "success")
+            return redirect(url_for('clinical_dashboard'))
+        elif username == 'dr.sarah' and password == 'sarah123':
+            session['clinical_user_id'] = 2
+            session['clinical_username'] = 'dr.sarah'
+            session['clinical_name'] = 'Dr. Sarah Johnson'
+            session['clinical_specialization'] = 'Cardiology'
+            flash("Welcome, Dr. Sarah Johnson!", "success")
+            return redirect(url_for('clinical_dashboard'))
+        else:
+            # Check database as fallback
+            conn = get_db_connection()
+            if conn:
+                cur = conn.cursor()
+                cur.execute("SELECT id, username, full_name, specialization FROM clinical_users WHERE username=? AND password=?", (username, password))
+                user = cur.fetchone()
+                cur.close()
+                conn.close()
+                
+                if user:
+                    session['clinical_user_id'] = user[0]
+                    session['clinical_username'] = user[1]
+                    session['clinical_name'] = user[2]
+                    session['clinical_specialization'] = user[3] if len(user) > 3 else 'General Medicine'
+                    flash(f"Welcome, {session['clinical_name']}!", "success")
+                    return redirect(url_for('clinical_dashboard'))
+            
+            flash("Invalid username or password. Try: doctor1 / doctor123", "danger")
+    
+    return render_template("clinical/login.html")
+
+@app.route('/clinical/dashboard')
+def clinical_dashboard():
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    doctor_name = session.get('clinical_name', 'Doctor')
+    doctor_id = session['clinical_user_id']
+    today = date.today().isoformat()
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get statistics - using doctor_name instead of doctor_id since appointments table doesn't have doctor_id
+        cur.execute("SELECT COUNT(*) FROM appointments WHERE doctor_name LIKE ? AND appointment_date = ?", (f'%{doctor_name}%', today))
+        appointments_today = cur.fetchone()[0] or 0
+        
+        # For consultations - these tables might not exist yet, so use try/except
+        active_consultations = 0
+        completed_today = 0
+        try:
+            cur.execute("SELECT COUNT(*) FROM consultations WHERE doctor_id=? AND status='In Progress'", (doctor_id,))
+            active_consultations = cur.fetchone()[0] or 0
+        except:
+            pass
+        
+        try:
+            cur.execute("SELECT COUNT(*) FROM consultations WHERE doctor_id=? AND DATE(completed_at)=?", (doctor_id, today))
+            completed_today = cur.fetchone()[0] or 0
+        except:
+            pass
+        
+        # Get queue - doctor_queue table might not exist yet
+        waiting_patients = 0
+        queue = []
+        try:
+            cur.execute("SELECT COUNT(*) FROM doctor_queue WHERE doctor_id=? AND status='Waiting'", (doctor_id,))
+            waiting_patients = cur.fetchone()[0] or 0
+            
+            # Get queue
+            cur.execute("""
+                SELECT id, queue_no as token_no, patient_name, priority, consultation_type, 
+                       strftime('%s', 'now') - strftime('%s', created_at) as wait_seconds
+                FROM doctor_queue 
+                WHERE doctor_id=? AND status='Waiting'
+                ORDER BY 
+                    CASE priority WHEN 'Emergency' THEN 1 WHEN 'High' THEN 2 WHEN 'Normal' THEN 3 ELSE 4 END,
+                    created_at ASC
+                LIMIT 10
+            """, (doctor_id,))
+            
+            for row in cur.fetchall():
+                queue.append({
+                    'id': row[0],
+                    'token_no': row[1],
+                    'patient_name': row[2],
+                    'priority': row[3] or 'Normal',
+                    'consultation_type': row[4] or 'General',
+                    'wait_time': round(row[5] / 60) if row[5] else 0
+                })
+        except Exception as e:
+            app.logger.warning(f"Queue table not ready: {e}")
+        
+    except Exception as e:
+        app.logger.error(f"Error loading clinical dashboard: {e}")
+        appointments_today = 0
+        active_consultations = 0
+        completed_today = 0
+        waiting_patients = 0
+        queue = []
+    
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template("clinical/dashboard.html",
+                         doctor_name=doctor_name,
+                         today_date=date.today().strftime("%A, %B %d, %Y"),
+                         appointments_today=appointments_today,
+                         active_consultations=active_consultations,
+                         completed_today=completed_today,
+                         waiting_patients=waiting_patients,
+                         pending_lab_results=0,
+                         pending_imaging=0,
+                         followup_patients=0,
+                         pending_referrals=0,
+                         queue=queue)    
+    
+
+@app.route('/clinical/logout')
+def clinical_logout():
+    session.pop('clinical_user_id', None)
+    session.pop('clinical_username', None)
+    session.pop('clinical_name', None)
+    session.pop('clinical_specialization', None)
+    flash("Logged out successfully", "success")
+    return redirect(url_for('clinical_login'))
+
+def create_default_clinical_user():
+    """Create default clinical/doctor user if none exists."""
+    conn = get_db_connection()
+    if not conn:
+        return
+    
+    cursor = conn.cursor()
+    
+    # Check if clinical_users table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='clinical_users'")
+    if not cursor.fetchone():
+        print("clinical_users table doesn't exist yet - will be created by create_tables()")
+        cursor.close()
+        conn.close()
+        return
+    
+    # Check if any clinical users exist
+    cursor.execute("SELECT COUNT(*) FROM clinical_users")
+    count = cursor.fetchone()[0]
+    
+    if count == 0:
+        # Create default doctor
+        default_password = generate_password_hash('doctor123')
+        cursor.execute("""
+            INSERT INTO clinical_users (username, password, full_name, email, specialization, license_number, role, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, ('doctor1', default_password, 'Dr. John Smith', 'doctor@hospital.com', 'General Medicine', 'LIC-001', 'Doctor', 1))
+        
+        # Add a second test doctor
+        cursor.execute("""
+            INSERT INTO clinical_users (username, password, full_name, email, specialization, license_number, role, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, ('dr.sarah', generate_password_hash('sarah123'), 'Dr. Sarah Johnson', 'sarah.j@hospital.com', 'Cardiology', 'LIC-002', 'Doctor', 1))
+        
+        conn.commit()
+        print("Created default clinical users: doctor1/doctor123, dr.sarah/sarah123")
+    else:
+        print(f"Clinical users already exist: {count} user(s)")
+        
+        # Optional: List existing users for debugging
+        cursor.execute("SELECT id, username, full_name, specialization FROM clinical_users WHERE is_active = 1")
+        users = cursor.fetchall()
+        for user in users:
+            print(f"  - {user[1]}: {user[2]} ({user[3]})")
+    
+    cursor.close()
+    conn.close()
+    
+@app.route('/clinical/debug-users')
+def debug_clinical_users():
+    if 'clinical_user_id' not in session:
+        # Allow access for debugging
+        pass
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id, username, password[:50] as password_preview, full_name, specialization, is_active FROM clinical_users")
+    users = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    result = "<h3>Clinical Users:</h3>"
+    for user in users:
+        result += f"<p>ID: {user[0]}, Username: {user[1]}, Password Hash: {user[2]}..., Name: {user[3]}, Specialization: {user[4]}, Active: {user[5]}</p>"
+    
+    # Add test info
+    result += "<hr>"
+    result += "<h3>Test Login Credentials:</h3>"
+    result += "<p><strong>Username:</strong> doctor1<br><strong>Password:</strong> doctor123</p>"
+    result += "<p><strong>Username:</strong> dr.sarah<br><strong>Password:</strong> sarah123</p>"
+    
+    return result
+
+@app.route('/clinical/check-db')
+def clinical_check_db():
+    conn = get_db_connection()
+    if not conn:
+        return "Database connection failed"
+    
+    cur = conn.cursor()
+    
+    # Check table structure
+    cur.execute("PRAGMA table_info(clinical_users)")
+    columns = cur.fetchall()
+    
+    result = "<h3>clinical_users table structure:</h3>"
+    result += "<table border='1'><tr><th>Column</th><th>Type</th><th>Nullable</th></tr>"
+    for col in columns:
+        result += f"<tr><td>{col[1]}</td><td>{col[2]}</td><td>{'YES' if col[3] else 'NO'}</td></tr>"
+    result += "</table>"
+    
+    # Get users
+    cur.execute("SELECT id, username, full_name, specialization, is_active FROM clinical_users")
+    users = cur.fetchall()
+    
+    result += "<h3>Current Users:</h3>"
+    result += "<table border='1'><tr><th>ID</th><th>Username</th><th>Full Name</th><th>Specialization</th><th>Active</th></tr>"
+    for user in users:
+        result += f"<tr><td>{user[0]}</td><td>{user[1]}</td><td>{user[2]}</td><td>{user[3]}</td><td>{user[4]}</td></tr>"
+    result += "</table>"
+    
+    # Test password verification for doctor1
+    cur.execute("SELECT password FROM clinical_users WHERE username = 'doctor1'")
+    pw_row = cur.fetchone()
+    if pw_row:
+        from werkzeug.security import check_password_hash
+        stored_pw = pw_row[0]
+        test_password = 'doctor123'
+        
+        result += "<h3>Password Test:</h3>"
+        result += f"<p>Testing password '{test_password}' for user 'doctor1'</p>"
+        
+        try:
+            if check_password_hash(stored_pw, test_password):
+                result += "<p style='color:green'>✓ Password verification SUCCESSFUL!</p>"
+            else:
+                result += "<p style='color:red'>✗ Password verification FAILED!</p>"
+                result += f"<p>Stored password hash: {stored_pw[:50]}...</p>"
+        except Exception as e:
+            result += f"<p style='color:red'>Error checking password: {e}</p>"
+    
+    cur.close()
+    conn.close()
+    
+    return result
+
+
+
+@app.route('/clinical/debug-schema')
+def debug_schema():
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    result = "<h3>Database Schema Check</h3>"
+    
+    # Check appointments table
+    cur.execute("PRAGMA table_info(appointments)")
+    columns = cur.fetchall()
+    result += "<h4>appointments table columns:</h4>"
+    result += "<ul>"
+    for col in columns:
+        result += f"<li>{col[1]} ({col[2]})</li>"
+    result += "</ul>"
+    
+    # Check if consultations table exists
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='consultations'")
+    if cur.fetchone():
+        cur.execute("PRAGMA table_info(consultations)")
+        cols = cur.fetchall()
+        result += "<h4>consultations table columns:</h4>"
+        result += "<ul>"
+        for col in cols:
+            result += f"<li>{col[1]} ({col[2]})</li>"
+        result += "</ul>"
+    else:
+        result += "<p>consultations table does not exist yet</p>"
+    
+    # Check if doctor_queue table exists
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='doctor_queue'")
+    if cur.fetchone():
+        cur.execute("PRAGMA table_info(doctor_queue)")
+        cols = cur.fetchall()
+        result += "<h4>doctor_queue table columns:</h4>"
+        result += "<ul>"
+        for col in cols:
+            result += f"<li>{col[1]} ({col[2]})</li>"
+        result += "</ul>"
+    else:
+        result += "<p>doctor_queue table does not exist yet</p>"
+    
+    cur.close()
+    conn.close()
+    
+    return result
+
+@app.route('/clinical/patients/search')
+def clinical_patient_search():
+    """Search patients for clinical use"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    search_term = request.args.get('q', '')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    query = """
+        SELECT id, patient_id, card_number, first_name, last_name, 
+               date_of_birth, gender, phone, registration_date
+        FROM patients 
+        WHERE status = 'Active'
+    """
+    params = []
+    
+    if search_term:
+        query += """ AND (first_name LIKE ? OR last_name LIKE ? 
+                   OR patient_id LIKE ? OR phone LIKE ? 
+                   OR hospital_no LIKE ? OR card_number LIKE ?)"""
+        search_pattern = f'%{search_term}%'
+        params = [search_pattern] * 6
+    
+    query += " ORDER BY first_name, last_name LIMIT 50"
+    
+    cur.execute(query, params)
+    patients = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return render_template("clinical/patient_search.html", 
+                         patients=patients, 
+                         search_term=search_term)
+    
+
+@app.route('/clinical/consultation/start/<int:patient_id>', methods=['GET', 'POST'])
+def start_consultation(patient_id):
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Get patient details
+    cur.execute("SELECT * FROM patients WHERE id = ?", (patient_id,))
+    patient = cur.fetchone()
+    
+    if not patient:
+        flash("Patient not found", "danger")
+        return redirect(url_for('clinical_patient_search'))
+    
+    if request.method == 'POST':
+        # Save consultation and update queue status
+        import uuid
+        consultation_no = f"CON-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
+        
+        chief_complaint = request.form.get('chief_complaint')
+        history = request.form.get('history')
+        past_history = request.form.get('past_history')
+        examination = request.form.get('examination')
+        diagnosis = request.form.get('diagnosis')
+        treatment = request.form.get('treatment')
+        follow_up = request.form.get('follow_up')
+        notes = request.form.get('notes')
+        
+        try:
+            cur.execute("""
+                INSERT INTO consultations (
+                    consultation_no, patient_id, patient_name, doctor_id, doctor_name,
+                    consultation_date, consultation_time, status,
+                    chief_complaint, history_of_present_illness, past_medical_history,
+                    physical_exam, diagnosis, treatment_plan, follow_up_date, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Completed', ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                consultation_no, patient_id, f"{patient[4]} {patient[5]}",
+                session['clinical_user_id'], session['clinical_name'],
+                date.today().isoformat(), datetime.now().strftime('%H:%M:%S'),
+                chief_complaint, history, past_history, examination,
+                diagnosis, treatment, follow_up if follow_up else None, notes
+            ))
+            
+            # Update queue status if patient is in queue
+            cur.execute("""
+                UPDATE doctor_queue 
+                SET status = 'Completed', completed_at = CURRENT_TIMESTAMP 
+                WHERE patient_id = ? AND doctor_id = ? AND status IN ('Waiting', 'Called', 'In Progress')
+            """, (patient_id, session['clinical_user_id']))
+            
+            conn.commit()
+            flash(f"Consultation saved successfully! No: {consultation_no}", "success")
+            return redirect(url_for('clinical_dashboard'))
+            
+        except Exception as e:
+            conn.rollback()
+            app.logger.error(f"Error saving consultation: {e}")
+            flash(f"Error saving consultation: {str(e)}", "danger")
+    
+    cur.close()
+    conn.close()
+    
+    return render_template("clinical/start_consultation.html", patient=patient)
+
+
+# ==================== CLINICAL ROUTES (Placeholders for now) ====================
+
+@app.route('/clinical/appointments')
+def clinical_appointments():
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    flash("Appointments feature coming soon!", "info")
+    return redirect(url_for('clinical_dashboard'))
+
+@app.route('/clinical/active-consultations')
+def clinical_active_consultations():
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    flash("Active consultations feature coming soon!", "info")
+    return redirect(url_for('clinical_dashboard'))
+
+@app.route('/clinical/consultation-history')
+def clinical_consultation_history():
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    flash("Consultation history feature coming soon!", "info")
+    return redirect(url_for('clinical_dashboard'))
+
+
+
+
+@app.route('/clinical/order-lab')
+def clinical_order_lab():
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    flash("Lab order feature coming soon!", "info")
+    return redirect(url_for('clinical_dashboard'))
+
+@app.route('/clinical/order-imaging')
+def clinical_order_imaging():
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    flash("Imaging order feature coming soon!", "info")
+    return redirect(url_for('clinical_dashboard'))
+
+@app.route('/clinical/notes')
+def clinical_notes():
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    flash("Clinical notes feature coming soon!", "info")
+    return redirect(url_for('clinical_dashboard'))
+
+@app.route('/clinical/lab-results')
+def clinical_lab_results():
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    flash("Lab results feature coming soon!", "info")
+    return redirect(url_for('clinical_dashboard'))
+
+@app.route('/clinical/imaging-reports')
+def clinical_imaging_reports():
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    flash("Imaging reports feature coming soon!", "info")
+    return redirect(url_for('clinical_dashboard'))
+
+@app.route('/clinical/followups')
+def clinical_followups():
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    flash("Follow-ups feature coming soon!", "info")
+    return redirect(url_for('clinical_dashboard'))
+
+@app.route('/clinical/referrals-inbox')
+def clinical_referrals_inbox():
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    flash("Referrals feature coming soon!", "info")
+    return redirect(url_for('clinical_dashboard'))
+
+@app.route('/clinical/queue')
+def clinical_queue():
+    """View doctor's patient queue"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    doctor_id = session['clinical_user_id']
+    doctor_name = session.get('clinical_name', '')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Get all patients in queue for this doctor
+    cur.execute("""
+        SELECT 
+            dq.id,
+            dq.queue_no,
+            dq.patient_id,
+            dq.patient_name,
+            dq.priority,
+            dq.status,
+            dq.consultation_type,
+            dq.wait_time_minutes,
+            dq.token_no,
+            dq.called_at,
+            dq.created_at,
+            p.card_number,
+            p.phone,
+            p.date_of_birth,
+            strftime('%s', 'now') - strftime('%s', dq.created_at) as wait_seconds
+        FROM doctor_queue dq
+        LEFT JOIN patients p ON dq.patient_id = p.id
+        WHERE dq.doctor_id = ? 
+        ORDER BY 
+            CASE dq.priority 
+                WHEN 'Emergency' THEN 1 
+                WHEN 'High' THEN 2 
+                WHEN 'Normal' THEN 3 
+                ELSE 4 
+            END,
+            dq.created_at ASC
+    """, (doctor_id,))
+    
+    queue_items = cur.fetchall()
+    
+    # Process queue items
+    waiting_queue = []
+    in_progress_queue = []
+    completed_queue = []
+    
+    for item in queue_items:
+        wait_minutes = round(item[14] / 60) if item[14] else item[8] or 0
+        
+        queue_item = {
+            'id': item[0],
+            'queue_no': item[1],
+            'patient_id': item[2],
+            'patient_name': item[3],
+            'priority': item[4] or 'Normal',
+            'status': item[5] or 'Waiting',
+            'consultation_type': item[6] or 'General',
+            'wait_time': wait_minutes,
+            'token_no': item[8],
+            'called_at': item[9],
+            'created_at': item[10],
+            'card_number': item[11],
+            'phone': item[12],
+            'date_of_birth': item[13]
+        }
+        
+        if queue_item['status'] == 'Waiting':
+            waiting_queue.append(queue_item)
+        elif queue_item['status'] == 'In Progress':
+            in_progress_queue.append(queue_item)
+        elif queue_item['status'] == 'Completed':
+            completed_queue.append(queue_item)
+    
+    # Get statistics
+    total_waiting = len(waiting_queue)
+    total_in_progress = len(in_progress_queue)
+    avg_wait_time = 0
+    if total_waiting > 0:
+        total_seconds = sum([item['wait_time'] for item in waiting_queue])
+        avg_wait_time = round(total_seconds / total_waiting)
+    
+    cur.close()
+    conn.close()
+    
+    return render_template("clinical/queue.html",
+                         waiting_queue=waiting_queue,
+                         in_progress_queue=in_progress_queue,
+                         completed_queue=completed_queue,
+                         total_waiting=total_waiting,
+                         total_in_progress=total_in_progress,
+                         avg_wait_time=avg_wait_time,
+                         doctor_name=doctor_name)
+    
+@app.route('/clinical/call-patient', methods=['POST'])
+def clinical_call_patient():
+    """Call a patient from the queue"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    queue_id = request.form.get('queue_id')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            UPDATE doctor_queue 
+            SET status = 'Called', 
+                called_at = CURRENT_TIMESTAMP 
+            WHERE id = ? AND doctor_id = ?
+        """, (queue_id, session['clinical_user_id']))
+        
+        conn.commit()
+        flash("Patient has been called!", "success")
+    except Exception as e:
+        app.logger.error(f"Error calling patient: {e}")
+        flash("Error calling patient", "danger")
+    finally:
+        cur.close()
+        conn.close()
+    
+    return redirect(url_for('clinical_queue'))
+
+@app.route('/clinical/remove-from-queue', methods=['POST'])
+def clinical_remove_from_queue():
+    """Remove a patient from the queue"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    queue_id = request.form.get('queue_id')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            DELETE FROM doctor_queue 
+            WHERE id = ? AND doctor_id = ?
+        """, (queue_id, session['clinical_user_id']))
+        
+        conn.commit()
+        flash("Patient removed from queue", "success")
+    except Exception as e:
+        app.logger.error(f"Error removing patient: {e}")
+        flash("Error removing patient", "danger")
+    finally:
+        cur.close()
+        conn.close()
+    
+    return redirect(url_for('clinical_queue'))
+
+@app.route('/clinical/write-prescription', methods=['GET', 'POST'])
+def clinical_write_prescription():
+    """Write prescription for a patient"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    from datetime import date as date_today
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Get available drugs from pharmacy
+    cur.execute("""
+        SELECT id, name, strength, unit_price, stock_quantity
+        FROM drugs 
+        WHERE stock_quantity > 0
+        ORDER BY name ASC
+        LIMIT 50
+    """)
+    drugs = cur.fetchall()
+    
+    if request.method == 'POST':
+        patient_name = request.form.get('patient_name')
+        patient_id_input = request.form.get('patient_id')
+        drug_name = request.form.get('drug_name')
+        strength = request.form.get('strength')
+        dosage = request.form.get('dosage')
+        frequency = request.form.get('frequency')
+        duration = request.form.get('duration')
+        quantity = request.form.get('quantity')
+        instructions = request.form.get('instructions')
+        refills = request.form.get('refills', 0)
+        is_controlled = request.form.get('is_controlled', '0')
+        
+        # Validate required fields
+        if not patient_name:
+            flash("Patient name is required", "danger")
+            cur.close()
+            conn.close()
+            return redirect(url_for('clinical_write_prescription'))
+        
+        if not drug_name:
+            flash("Drug name is required", "danger")
+            cur.close()
+            conn.close()
+            return redirect(url_for('clinical_write_prescription'))
+        
+        # Handle patient_id - if provided and exists, use it; otherwise create new patient or set to None
+        actual_patient_id = None
+        
+        if patient_id_input and patient_id_input != '':
+            # Check if the patient ID exists
+            cur.execute("SELECT id FROM patients WHERE id = ?", (patient_id_input,))
+            if cur.fetchone():
+                actual_patient_id = patient_id_input
+            else:
+                # Try to find patient by name
+                name_parts = patient_name.strip().split(' ', 1)
+                first_name = name_parts[0]
+                last_name = name_parts[1] if len(name_parts) > 1 else ''
+                
+                cur.execute("SELECT id FROM patients WHERE first_name = ? AND last_name = ?", (first_name, last_name))
+                existing = cur.fetchone()
+                if existing:
+                    actual_patient_id = existing[0]
+        else:
+            # Try to find patient by name
+            name_parts = patient_name.strip().split(' ', 1)
+            first_name = name_parts[0]
+            last_name = name_parts[1] if len(name_parts) > 1 else ''
+            
+            cur.execute("SELECT id FROM patients WHERE first_name = ? AND last_name = ?", (first_name, last_name))
+            existing = cur.fetchone()
+            if existing:
+                actual_patient_id = existing[0]
+        
+        prescription_no = f"RX-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+        prescribed_date = date_today.today().isoformat()
+        prescribed_time = datetime.now().strftime('%H:%M:%S')
+        expires_date = (date_today.today() + timedelta(days=90)).isoformat()
+        
+        try:
+            # Insert prescription (patient_id can be NULL for now)
+            cur.execute("""
+                INSERT INTO prescriptions (
+                    prescription_no, patient_id, patient_name, doctor_id, doctor_name,
+                    drug_name, strength, dosage, frequency, duration, quantity,
+                    instructions, refills, is_controlled, status,
+                    prescribed_date, prescribed_time, expires_date
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?, ?)
+            """, (
+                prescription_no, actual_patient_id, patient_name, session['clinical_user_id'],
+                session['clinical_name'], drug_name, strength, dosage, frequency,
+                duration, quantity, instructions, refills, is_controlled,
+                prescribed_date, prescribed_time, expires_date
+            ))
+            
+            conn.commit()
+            prescription_id = cur.lastrowid
+            flash(f"Prescription {prescription_no} written successfully!", "success")
+            cur.close()
+            conn.close()
+            return redirect(url_for('clinical_prescription_view', prescription_id=prescription_id))
+            
+        except Exception as e:
+            conn.rollback()
+            app.logger.error(f"Error writing prescription: {e}")
+            flash(f"Error writing prescription: {str(e)}", "danger")
+    
+    cur.close()
+    conn.close()
+    
+    return render_template("clinical/write_prescription.html",
+                         drugs=drugs,
+                         today_date=date_today.today().strftime("%A, %B %d, %Y"))        
+    
+@app.route('/clinical/prescription/<int:prescription_id>')
+def clinical_prescription_view(prescription_id):
+    """View a specific prescription"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT * FROM prescriptions WHERE id = ? AND doctor_id = ?
+    """, (prescription_id, session['clinical_user_id']))
+    
+    prescription = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if not prescription:
+        flash("Prescription not found", "danger")
+        return redirect(url_for('clinical_dashboard'))
+    
+    return render_template("clinical/prescription_view.html", prescription=prescription)
+
+@app.route('/clinical/prescriptions')
+def clinical_prescriptions():
+    """List all prescriptions by the doctor"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT id, prescription_no, patient_name, drug_name, dosage, frequency,
+               duration, status, prescribed_date
+        FROM prescriptions 
+        WHERE doctor_id = ?
+        ORDER BY prescribed_date DESC
+        LIMIT 50
+    """, (session['clinical_user_id'],))
+    
+    prescriptions = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return render_template("clinical/prescriptions_list.html", prescriptions=prescriptions)
+
+@app.route('/clinical/prescription/<int:prescription_id>/print')
+def clinical_prescription_print(prescription_id):
+    """Print a prescription"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT p.*, 
+               pat.first_name, pat.last_name, pat.date_of_birth, pat.gender
+        FROM prescriptions p
+        JOIN patients pat ON p.patient_id = pat.id
+        WHERE p.id = ? AND p.doctor_id = ?
+    """, (prescription_id, session['clinical_user_id']))
+    
+    prescription = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if not prescription:
+        flash("Prescription not found", "danger")
+        return redirect(url_for('clinical_dashboard'))
+    
+    return render_template("clinical/prescription_print.html", prescription=prescription)
+
+@app.route('/api/clinical/patients/search')
+def api_clinical_patient_search():
+    """API endpoint to search patients for prescription form"""
+    if 'clinical_user_id' not in session:
+        return jsonify([])
+    
+    search_term = request.args.get('q', '')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT id, patient_id, card_number, first_name, last_name, phone
+        FROM patients 
+        WHERE status = 'Active'
+        AND (first_name LIKE ? OR last_name LIKE ? OR patient_id LIKE ? OR card_number LIKE ? OR phone LIKE ?)
+        LIMIT 15
+    """, (f'%{search_term}%', f'%{search_term}%', f'%{search_term}%', f'%{search_term}%', f'%{search_term}%'))
+    
+    patients = []
+    for row in cur.fetchall():
+        patients.append({
+            'id': row[0],
+            'patient_id': row[1],
+            'card_number': row[2],
+            'first_name': row[3],
+            'last_name': row[4],
+            'name': f"{row[3]} {row[4]}",
+            'phone': row[5]
+        })
+    
+    cur.close()
+    conn.close()
+    
+    return jsonify(patients)
+
+
+@app.route('/api/clinical/prescriptions/list')
+def api_clinical_prescriptions_list():
+    """API endpoint to get prescriptions for the doctor"""
+    if 'clinical_user_id' not in session:
+        return jsonify([])
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT 
+            id, prescription_no, patient_name, drug_name, dosage, frequency,
+            duration, quantity, status, prescribed_date, expires_date,
+            instructions, refills, is_controlled
+        FROM prescriptions 
+        WHERE doctor_id = ?
+        ORDER BY prescribed_date DESC
+        LIMIT 200
+    """, (session['clinical_user_id'],))
+    
+    prescriptions = []
+    for row in cur.fetchall():
+        prescriptions.append({
+            'id': row[0],
+            'prescription_no': row[1],
+            'patient_name': row[2],
+            'drug_name': row[3],
+            'dosage': row[4],
+            'frequency': row[5],
+            'duration': row[6],
+            'quantity': row[7],
+            'status': row[8],
+            'prescribed_date': row[9],
+            'expires_date': row[10],
+            'instructions': row[11],
+            'refills': row[12],
+            'is_controlled': row[13]
+        })
+    
+    cur.close()
+    conn.close()
+    
+    return jsonify(prescriptions)
+
+@app.route('/api/clinical/prescriptions/delete/<int:prescription_id>', methods=['DELETE'])
+def api_clinical_prescription_delete(prescription_id):
+    """Delete a prescription"""
+    if 'clinical_user_id' not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # First check if prescription belongs to this doctor
+        cur.execute("SELECT id FROM prescriptions WHERE id = ? AND doctor_id = ?", 
+                   (prescription_id, session['clinical_user_id']))
+        if not cur.fetchone():
+            return jsonify({"success": False, "message": "Prescription not found or access denied"}), 404
+        
+        # Delete the prescription
+        cur.execute("DELETE FROM prescriptions WHERE id = ?", (prescription_id,))
+        conn.commit()
+        
+        return jsonify({"success": True, "message": "Prescription deleted successfully"})
+        
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f"Error deleting prescription: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+# Call this function after create_tables() in your main block
 if __name__ == "__main__":
-    create_tables()  # Your existing tables
-    create_default_users()  # Your existing default users
-    create_default_hr_data()  # Add default HR data
+    create_tables()
+    add_card_number_column()
+    create_default_users()
+    create_default_hr_data()
+    create_sample_lab_tests()
+    create_default_clinical_user()
+    update_lab_requests_table()  
+    update_prescriptions_table()
+    add_card_number_column_and_backfill()
     app.run(debug=True)

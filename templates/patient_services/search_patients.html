@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Patients</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { background: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .navbar-brand, .nav-link { color: white !important; }
+        .card { border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border: none; margin-bottom: 20px; }
+        .card-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 15px 15px 0 0; }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; }
+        .search-box { margin-bottom: 20px; }
+        .patient-card { 
+            background: white; 
+            border-radius: 10px; 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            border-left: 4px solid #28a745;
+            cursor: pointer;
+        }
+        .patient-card.deleted { 
+            border-left-color: #dc3545;
+            background: #f8f9fa;
+            opacity: 0.85;
+        }
+        .patient-card:hover { 
+            transform: translateX(5px); 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1); 
+        }
+        .patient-name { font-size: 18px; font-weight: bold; color: #667eea; }
+        .delete-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+        }
+        .action-buttons {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .action-buttons .btn-sm {
+            padding: 4px 10px;
+            font-size: 12px;
+        }
+        .status-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+        }
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .fade-enter {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .clickable-area {
+            cursor: pointer;
+        }
+        .btn-group-vertical {
+            gap: 5px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="#"><i class="bi bi-search"></i> Search Patients</a>
+            <div class="ms-auto">
+                <a href="{{ url_for('patient_services_dashboard') }}" class="btn btn-light btn-sm me-2">Dashboard</a>
+                <a href="{{ url_for('register_patient') }}" class="btn btn-success btn-sm me-2">New Patient</a>
+                <a href="{{ url_for('patient_services_logout') }}" class="btn btn-danger btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-number">{{ patients|length }}</div>
+                    <div class="stat-label">Total Results</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-number">
+                        {% set active_count = patients|selectattr('status', 'equalto', 'Active')|list|length %}
+                        {{ active_count }}
+                    </div>
+                    <div class="stat-label">Active Patients</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-number">
+                        {% set deleted_count = patients|selectattr('status', 'equalto', 'Deleted')|list|length %}
+                        {{ deleted_count }}
+                    </div>
+                    <div class="stat-label">Deleted/Inactive</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-search"></i> Find Patient</h5>
+            </div>
+            <div class="card-body">
+                <form method="GET" class="search-box" id="searchForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <input type="text" name="q" id="searchInput" class="form-control form-control-lg" 
+                                       placeholder="Search by name, ID, card number, or phone number..." 
+                                       value="{{ search_term }}">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="bi bi-search"></i> Search
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" id="showDeleted" name="show_deleted" 
+                                       value="1" {% if show_deleted == '1' %}checked{% endif %} 
+                                       onchange="document.getElementById('searchForm').submit();">
+                                <label class="form-check-label" for="showDeleted">
+                                    <i class="bi bi-trash"></i> Show deleted patients
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-2 text-end">
+                            <a href="{{ url_for('register_patient') }}" class="btn btn-success btn-lg w-100">
+                                <i class="bi bi-person-plus"></i> New Patient
+                            </a>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6>Search Results ({{ patients|length }} found)</h6>
+                            {% if patients %}
+                            <button class="btn btn-sm btn-secondary" onclick="window.print();">
+                                <i class="bi bi-printer"></i> Print Results
+                            </button>
+                            {% endif %}
+                        </div>
+                        <hr>
+                    </div>
+                    
+                    {% for patient in patients %}
+                    <div class="col-md-6 fade-enter">
+                        <div class="patient-card {% if patient.status == 'Deleted' %}deleted{% endif %}" 
+                             data-patient-id="{{ patient.id }}">
+                            
+                            <!-- Status Badge -->
+                            {% if patient.status == 'Deleted' %}
+                            <span class="status-badge badge bg-danger">
+                                <i class="bi bi-trash"></i> DELETED
+                            </span>
+                            {% else %}
+                            <span class="status-badge badge bg-success">
+                                <i class="bi bi-check-circle"></i> ACTIVE
+                            </span>
+                            {% endif %}
+                            
+                            <!-- Delete/Restore Button -->
+                            {% if patient.status != 'Deleted' %}
+                            <button class="btn btn-sm btn-danger delete-btn" 
+                                    onclick="event.stopPropagation(); showDeleteModal('{{ patient.id }}', '{{ patient.first_name }} {{ patient.last_name }}', '{{ patient.patient_id }}', '{{ patient.card_number or '' }}')">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                            {% else %}
+                            <button class="btn btn-sm btn-warning delete-btn" 
+                                    onclick="event.stopPropagation(); restorePatient('{{ patient.id }}', '{{ patient.first_name }} {{ patient.last_name }}')">
+                                <i class="bi bi-arrow-repeat"></i> Restore
+                            </button>
+                            {% endif %}
+                            
+                            <!-- Patient Info Area -->
+                            <div onclick="location.href='{{ url_for('view_patient', patient_id=patient.id) }}'" class="clickable-area">
+                                <div class="row">
+                                    <div class="col-8">
+                                        <div class="patient-name">
+                                            <i class="bi bi-person-circle"></i> {{ patient.first_name }} {{ patient.last_name }}
+                                        </div>
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <i class="bi bi-credit-card"></i> <strong>Card:</strong> {{ patient.card_number or 'Not assigned' }}
+                                            </small>
+                                        </div>
+                                        <div>
+                                            <small><i class="bi bi-hospital"></i> ID: {{ patient.patient_id }}</small>
+                                        </div>
+                                        <div>
+                                            <small><i class="bi bi-card-text"></i> Hospital No: {{ patient.hospital_no }}</small>
+                                        </div>
+                                        <div>
+                                            <small><i class="bi bi-telephone"></i> {{ patient.phone or 'No phone' }}</small>
+                                        </div>
+                                        {% if patient.blood_group %}
+                                        <div>
+                                            <small><i class="bi bi-droplet"></i> Blood: {{ patient.blood_group }}</small>
+                                        </div>
+                                        {% endif %}
+                                        <div>
+                                            <small><i class="bi bi-calendar"></i> Registered: {{ patient.registration_date }}</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-4 text-end">
+                                        <span class="badge bg-info mt-2">
+                                            <i class="bi bi-eye"></i> View Details →
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Action Buttons (only for active patients) -->
+                            {% if patient.status != 'Deleted' %}
+                            <div class="action-buttons" onclick="event.stopPropagation();">
+                                <a href="{{ url_for('edit_patient', patient_id=patient.id) }}" class="btn btn-sm btn-warning">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                                <a href="{{ url_for('book_appointment') }}?patient_id={{ patient.id }}" class="btn btn-sm btn-primary">
+                                    <i class="bi bi-calendar-plus"></i> Book
+                                </a>
+                                <a href="{{ url_for('patient_checkin') }}?patient_id={{ patient.id }}" class="btn btn-sm btn-success">
+                                    <i class="bi bi-check-circle"></i> Check In
+                                </a>
+                            </div>
+                            {% else %}
+                            <div class="action-buttons" onclick="event.stopPropagation();">
+                                <a href="{{ url_for('view_patient', patient_id=patient.id) }}" class="btn btn-sm btn-secondary">
+                                    <i class="bi bi-archive"></i> View Archive
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="col-12">
+                        <div class="alert alert-info text-center">
+                            <i class="bi bi-info-circle fs-3 d-block mb-2"></i>
+                            <h5>No patients found</h5>
+                            <p>Try a different search term or <a href="{{ url_for('register_patient') }}">register a new patient</a></p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle"></i> Confirm Delete Patient
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="fs-5">Are you sure you want to delete <strong id="deletePatientName"></strong>?</p>
+                    <div class="alert alert-warning">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Patient Information:</strong><br>
+                        <strong>Patient ID:</strong> <span id="deletePatientId"></span><br>
+                        <strong>Card Number:</strong> <span id="deleteCardNumber"></span>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle-fill"></i>
+                        <strong>Note:</strong> This is a <strong>soft delete</strong>. The patient data will be preserved but marked as inactive. 
+                        You can restore the patient later if needed. All medical records and history will remain intact.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                    <form method="POST" id="deleteForm" style="display: inline;">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Yes, Delete Patient
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restore Confirmation Modal -->
+    <div class="modal fade" id="restoreModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title">
+                        <i class="bi bi-arrow-repeat"></i> Confirm Restore Patient
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to restore <strong id="restorePatientName"></strong>?</p>
+                    <p>The patient will become active again and will appear in search results.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                    <form method="POST" id="restoreForm" style="display: inline;">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-arrow-repeat"></i> Yes, Restore Patient
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Show delete confirmation modal
+        function showDeleteModal(patientId, patientName, patientIdNumber, cardNumber) {
+            document.getElementById('deletePatientName').textContent = patientName;
+            document.getElementById('deletePatientId').textContent = patientIdNumber;
+            document.getElementById('deleteCardNumber').textContent = cardNumber || 'Not assigned';
+            document.getElementById('deleteForm').action = "{{ url_for('delete_patient', patient_id=0) }}".replace('0', patientId);
+            
+            new bootstrap.Modal(document.getElementById('deleteModal')).show();
+        }
+        
+        // Show restore confirmation modal
+        function restorePatient(patientId, patientName) {
+            document.getElementById('restorePatientName').textContent = patientName;
+            document.getElementById('restoreForm').action = "{{ url_for('restore_patient', patient_id=0) }}".replace('0', patientId);
+            new bootstrap.Modal(document.getElementById('restoreModal')).show();
+        }
+        
+        // Auto-search on Enter key
+        document.getElementById('searchInput')?.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('searchForm').submit();
+            }
+        });
+        
+        // Highlight search term in results
+        function highlightSearchTerm() {
+            const searchTerm = "{{ search_term }}".toLowerCase();
+            if (!searchTerm) return;
+            
+            document.querySelectorAll('.patient-name').forEach(element => {
+                const text = element.textContent;
+                if (text.toLowerCase().includes(searchTerm)) {
+                    const regex = new RegExp(`(${searchTerm})`, 'gi');
+                    element.innerHTML = text.replace(regex, '<mark style="background: #ffd700; padding: 0 2px; border-radius: 3px;">$1</mark>');
+                }
+            });
+        }
+        
+        // Run highlight on load
+        document.addEventListener('DOMContentLoaded', highlightSearchTerm);
+        
+        // Add animation for new search results
+        document.getElementById('searchForm')?.addEventListener('submit', function() {
+            document.querySelectorAll('.patient-card').forEach(card => {
+                card.style.animation = 'fadeIn 0.3s ease-in';
+            });
+        });
+    </script>
+    
+    <style>
+        @media print {
+            .navbar, .delete-btn, .action-buttons, .stat-card, .btn, .search-box {
+                display: none !important;
+            }
+            .patient-card {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+            body {
+                background: white;
+            }
+        }
+    </style>
+</body>
+</html>

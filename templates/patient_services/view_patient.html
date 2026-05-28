@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Details</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { background: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card { border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border: none; margin-bottom: 20px; }
+        .card-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 15px 15px 0 0; }
+        .info-row { padding: 10px; border-bottom: 1px solid #e0e0e0; }
+        .info-label { font-weight: 600; color: #666; width: 180px; display: inline-block; }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; }
+        .status-active { color: #28a745; font-weight: bold; }
+        /* Card Number Highlight */
+        .card-number-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+        .card-number-box .label {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(255,255,255,0.9);
+            display: block;
+        }
+        .card-number-box .number {
+            font-size: 28px;
+            font-weight: bold;
+            color: white;
+            letter-spacing: 2px;
+            font-family: 'Courier New', monospace;
+        }
+        .badge-card {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        .status-deleted {
+            background: #dc3545;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            display: inline-block;
+        }
+        .deleted-patient-alert {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="#"><i class="bi bi-person-badge"></i> Patient Details</a>
+            <div class="ms-auto">
+                <a href="{{ url_for('search_patients') }}" class="btn btn-light btn-sm me-2">Back to Search</a>
+                <a href="{{ url_for('patient_services_dashboard') }}" class="btn btn-light btn-sm me-2">Dashboard</a>
+                <a href="{{ url_for('patient_services_logout') }}" class="btn btn-danger btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Deleted Patient Alert -->
+        {% if patient.status == 'Deleted' %}
+        <div class="deleted-patient-alert">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-exclamation-triangle fs-4 me-2" style="color: #dc3545;"></i>
+                    <strong>This patient has been deleted</strong> - The record is archived and marked as inactive.
+                </div>
+                <form method="POST" action="{{ url_for('restore_patient', patient_id=patient.id) }}" style="display: inline;">
+                    <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('Restore this patient? The patient will become active again.')">
+                        <i class="bi bi-arrow-repeat"></i> Restore Patient
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- CARD NUMBER HIGHLIGHT SECTION -->
+        <div class="card-number-box">
+            <span class="label"><i class="bi bi-credit-card"></i> HOSPITAL CARD NUMBER</span>
+            <div class="number">{{ patient.card_number or 'Not Assigned' }}</div>
+            <span class="badge-card mt-2">
+                <i class="bi bi-check-circle"></i> Valid Patient Card
+            </span>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-person-circle"></i> Personal Information</h5>
+                    {% if patient.status == 'Deleted' %}
+                        <span class="status-deleted"><i class="bi bi-trash"></i> DELETED</span>
+                    {% else %}
+                        <span class="badge bg-success"><i class="bi bi-check-circle"></i> ACTIVE</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="info-row">
+                            <span class="info-label"><i class="bi bi-credit-card"></i> Card Number:</span> 
+                            <strong class="text-primary">{{ patient.card_number or 'N/A' }}</strong>
+                        </div>
+                        <div class="info-row"><span class="info-label"><i class="bi bi-qr-code"></i> Patient ID:</span> {{ patient.patient_id }}</div>
+                        <div class="info-row"><span class="info-label"><i class="bi bi-hospital"></i> Hospital No:</span> {{ patient.hospital_no }}</div>
+                        <div class="info-row"><span class="info-label"><i class="bi bi-person"></i> Full Name:</span> {{ patient.first_name }} {{ patient.last_name }}</div>
+                        <div class="info-row"><span class="info-label"><i class="bi bi-calendar"></i> Date of Birth:</span> {{ patient.date_of_birth }}</div>
+                        <div class="info-row"><span class="info-label"><i class="bi bi-gender-ambiguous"></i> Gender:</span> {{ patient.gender }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-row"><span class="info-label"><i class="bi bi-droplet"></i> Blood Group:</span> {{ patient.blood_group or 'N/A' }}</div>
+                        <div class="info-row"><span class="info-label"><i class="bi bi-dna"></i> Genotype:</span> {{ patient.genotype or 'N/A' }}</div>
+                        <div class="info-row"><span class="info-label"><i class="bi bi-telephone"></i> Phone:</span> {{ patient.phone or 'N/A' }}</div>
+                        <div class="info-row"><span class="info-label"><i class="bi bi-envelope"></i> Email:</span> {{ patient.email or 'N/A' }}</div>
+                        <div class="info-row"><span class="info-label"><i class="bi bi-geo-alt"></i> Address:</span> {{ patient.address or 'N/A' }}</div>
+                        <div class="info-row"><span class="info-label"><i class="bi bi-calendar-check"></i> Registration Date:</span> {{ patient.registration_date }}</div>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-briefcase"></i> Employment & Social</h6>
+                        <div class="info-row"><span class="info-label">Occupation:</span> {{ patient.occupation or 'N/A' }}</div>
+                        <div class="info-row"><span class="info-label">Marital Status:</span> {{ patient.marital_status or 'N/A' }}</div>
+                        <div class="info-row"><span class="info-label">Nationality:</span> {{ patient.nationality or 'N/A' }}</div>
+                        <div class="info-row"><span class="info-label">Religion:</span> {{ patient.religion or 'N/A' }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-heart"></i> Emergency & Next of Kin</h6>
+                        <div class="info-row"><span class="info-label">Emergency Contact:</span> {{ patient.emergency_contact_name or 'N/A' }}</div>
+                        <div class="info-row"><span class="info-label">Emergency Phone:</span> {{ patient.emergency_contact_phone or 'N/A' }}</div>
+                        <div class="info-row"><span class="info-label">Next of Kin:</span> {{ patient.next_of_kin or 'N/A' }}</div>
+                        <div class="info-row"><span class="info-label">Next of Kin Phone:</span> {{ patient.next_of_kin_phone or 'N/A' }}</div>
+                    </div>
+                </div>
+                {% if patient.notes %}
+                <hr>
+                <div class="row">
+                    <div class="col-12">
+                        <h6><i class="bi bi-file-text"></i> Notes</h6>
+                        <div class="info-row"><span class="info-label">Additional Notes:</span> {{ patient.notes }}</div>
+                    </div>
+                </div>
+                {% endif %}
+                <div class="text-end mt-3">
+                    {% if patient.status != 'Deleted' %}
+                        <a href="{{ url_for('edit_patient', patient_id=patient.id) }}" class="btn btn-warning">
+                            <i class="bi bi-pencil"></i> Edit Information
+                        </a>
+                        <a href="{{ url_for('book_appointment') }}?patient_id={{ patient.id }}" class="btn btn-primary">
+                            <i class="bi bi-calendar-plus"></i> Book Appointment
+                        </a>
+                        <a href="{{ url_for('patient_checkin') }}?patient_id={{ patient.id }}" class="btn btn-info">
+                            <i class="bi bi-check-circle"></i> Check In
+                        </a>
+                        <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                            <i class="bi bi-trash"></i> Delete Patient
+                        </button>
+                    {% else %}
+                        <form method="POST" action="{{ url_for('restore_patient', patient_id=patient.id) }}" style="display: inline;">
+                            <button type="submit" class="btn btn-warning" onclick="return confirm('Restore this patient?')">
+                                <i class="bi bi-arrow-repeat"></i> Restore Patient
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-calendar"></i> Recent Appointments</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Doctor</th>
+                                <th>Department</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for apt in appointments %}
+                            <tr>
+                                <td>{{ apt.appointment_date }}</td>
+                                <td>{{ apt.appointment_time }}</td>
+                                <td>{{ apt.doctor_name or 'N/A' }}</td>
+                                <td>{{ apt.department or 'N/A' }}</td>
+                                <td>
+                                    {% if apt.status == 'Scheduled' %}
+                                        <span class="badge bg-success">{{ apt.status }}</span>
+                                    {% elif apt.status == 'Cancelled' %}
+                                        <span class="badge bg-danger">{{ apt.status }}</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ apt.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if apt.status == 'Scheduled' and patient.status != 'Deleted' %}
+                                    <form method="POST" action="{{ url_for('cancel_appointment', appointment_id=apt.id) }}" style="display:inline;">
+                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Cancel this appointment?')">
+                                            <i class="bi bi-x-circle"></i> Cancel
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center">No appointments found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Queue History</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Token No</th>
+                                <th>Service Type</th>
+                                <th>Priority</th>
+                                <th>Status</th>
+                                <th>Created At</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for q in queue_history %}
+                            <tr>
+                                <td><strong>{{ q.token_no }}</strong></td>
+                                <td>{{ q.service_type }}</td>
+                                <td>
+                                    {% if q.priority == 'High' %}
+                                        <span class="badge bg-danger">{{ q.priority }}</span>
+                                    {% else %}
+                                        <span class="badge bg-info">{{ q.priority }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if q.status == 'Waiting' %}
+                                        <span class="badge bg-warning">{{ q.status }}</span>
+                                    {% elif q.status == 'Called' %}
+                                        <span class="badge bg-primary">{{ q.status }}</span>
+                                    {% elif q.status == 'Completed' %}
+                                        <span class="badge bg-success">{{ q.status }}</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ q.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ q.created_at[:16] if q.created_at else 'N/A' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center">No queue history found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions Card -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-lightning-charge"></i> Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('book_appointment') }}?patient_id={{ patient.id }}" class="btn btn-outline-primary w-100 {% if patient.status == 'Deleted' %}disabled{% endif %}">
+                            <i class="bi bi-calendar-plus"></i> Book Appointment
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('patient_checkin') }}?patient_id={{ patient.id }}" class="btn btn-outline-info w-100 {% if patient.status == 'Deleted' %}disabled{% endif %}">
+                            <i class="bi bi-check-circle"></i> Check In
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <a href="#" class="btn btn-outline-secondary w-100" onclick="window.print();">
+                            <i class="bi bi-printer"></i> Print Details
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('edit_patient', patient_id=patient.id) }}" class="btn btn-outline-warning w-100 {% if patient.status == 'Deleted' %}disabled{% endif %}">
+                            <i class="bi bi-pencil"></i> Edit Profile
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Confirm Delete Patient
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="fs-5">Are you sure you want to delete <strong>{{ patient.first_name }} {{ patient.last_name }}</strong>?</p>
+                    
+                    <div class="alert alert-warning">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>Patient Information:</strong><br>
+                        <strong>Patient ID:</strong> {{ patient.patient_id }}<br>
+                        <strong>Hospital No:</strong> {{ patient.hospital_no }}<br>
+                        <strong>Card Number:</strong> {{ patient.card_number or 'N/A' }}
+                    </div>
+
+                    <div class="alert alert-secondary">
+                        <i class="bi bi-calendar-check"></i>
+                        <strong>Active Records:</strong><br>
+                        <ul class="mb-0 mt-2">
+                            <li>Appointments: {{ appointments|selectattr('status', 'equalto', 'Scheduled')|list|length }} active</li>
+                            <li>Queue entries: {{ queue_history|selectattr('status', 'equalto', 'Waiting')|list|length }} active</li>
+                        </ul>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle-fill"></i>
+                        <strong>Note:</strong> This is a <strong>soft delete</strong>. The patient data will be preserved but marked as inactive. 
+                        You can restore the patient later if needed. All medical records and history will remain intact.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                    <form method="POST" action="{{ url_for('delete_patient', patient_id=patient.id) }}" style="display: inline;">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Yes, Delete Patient
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

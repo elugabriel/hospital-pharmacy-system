@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Write Prescription - Clinical</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { background: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .navbar { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); }
+        .navbar-brand, .nav-link { color: white !important; }
+        .card { border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border: none; margin-bottom: 20px; }
+        .card-header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; border-radius: 15px 15px 0 0; }
+        .btn-primary { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border: none; }
+        .form-label { font-weight: 600; }
+        .welcome-bar {
+            background: white;
+            border-radius: 10px;
+            padding: 10px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .drug-search {
+            position: relative;
+        }
+        .drug-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        .drug-suggestion-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        .drug-suggestion-item:hover {
+            background: #f0f0f0;
+        }
+        .patient-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        .patient-suggestion-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        .patient-suggestion-item:hover {
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('clinical_dashboard') }}"><i class="bi bi-heart-pulse"></i> Clinical Services</a>
+            <div class="ms-auto">
+                <span class="text-white me-3">Dr. {{ session.get('clinical_username') }}</span>
+                <a href="{{ url_for('clinical_logout') }}" class="btn btn-danger btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Welcome Bar -->
+        <div class="welcome-bar d-flex justify-content-between align-items-center">
+            <div>
+                <i class="bi bi-capsule fs-4 me-2"></i>
+                <span>Write Prescription</span>
+            </div>
+            <div>
+                <i class="bi bi-calendar3 me-2"></i>
+                <span>{{ today_date }}</span>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-pencil-square"></i> Prescription Form</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" id="prescriptionForm">
+                            <!-- Patient Name Field with Search -->
+                            <div class="mb-3">
+                                <label class="form-label"><i class="bi bi-person"></i> Patient Name *</label>
+                                <div class="patient-search" style="position: relative;">
+                                    <input type="text" id="patientSearch" class="form-control" 
+                                           placeholder="Type patient name " 
+                                           autocomplete="off" required>
+                                    <input type="hidden" name="patient_name" id="patientName">
+                                    <input type="hidden" name="patient_id" id="patientId">
+                                    <div id="patientSuggestions" class="patient-suggestions"></div>
+                                </div>
+                                <small class="text-muted">Start typing to search for existing patients</small>
+                            </div>
+
+                            <!-- Drug Selection -->
+                            <div class="mb-3">
+                                <label class="form-label"><i class="bi bi-capsule"></i> Drug Name *</label>
+                                <div class="drug-search">
+                                    <input type="text" id="drugSearch" class="form-control" placeholder="Search for a drug..." autocomplete="off" required>
+                                    <input type="hidden" name="drug_name" id="drugName">
+                                    <input type="hidden" name="strength" id="drugStrength">
+                                    <div id="drugSuggestions" class="drug-suggestions"></div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Dosage *</label>
+                                    <input type="text" name="dosage" class="form-control" required placeholder="e.g., 500mg, 1 tablet">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Frequency *</label>
+                                    <select name="frequency" class="form-select" required>
+                                        <option value="">Select frequency</option>
+                                        <option value="Once daily">Once daily</option>
+                                        <option value="Twice daily">Twice daily</option>
+                                        <option value="Three times daily">Three times daily</option>
+                                        <option value="Four times daily">Four times daily</option>
+                                        <option value="Every 4 hours">Every 4 hours</option>
+                                        <option value="Every 6 hours">Every 6 hours</option>
+                                        <option value="Every 8 hours">Every 8 hours</option>
+                                        <option value="As needed">As needed (PRN)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Duration *</label>
+                                    <select name="duration" class="form-select" required>
+                                        <option value="">Select duration</option>
+                                        <option value="1 day">1 day</option>
+                                        <option value="3 days">3 days</option>
+                                        <option value="5 days">5 days</option>
+                                        <option value="7 days">7 days</option>
+                                        <option value="10 days">10 days</option>
+                                        <option value="14 days">14 days</option>
+                                        <option value="21 days">21 days</option>
+                                        <option value="30 days">30 days</option>
+                                        <option value="60 days">60 days</option>
+                                        <option value="90 days">90 days</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Quantity *</label>
+                                    <input type="number" name="quantity" class="form-control" required placeholder="Number of units">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Instructions</label>
+                                <textarea name="instructions" class="form-control" rows="2" placeholder="e.g., Take with food, before meals, after meals"></textarea>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Refills</label>
+                                    <select name="refills" class="form-select">
+                                        <option value="0">0</option>
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="5">5</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="form-check mt-4">
+                                        <input type="checkbox" name="is_controlled" value="1" class="form-check-input" id="isControlled">
+                                        <label class="form-check-label" for="isControlled">
+                                            <i class="bi bi-exclamation-triangle text-warning"></i> Controlled Substance
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-end">
+                                <a href="{{ url_for('clinical_dashboard') }}" class="btn btn-secondary">Cancel</a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-save"></i> Save Prescription
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Prescription Guidelines</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="bi bi-lightbulb"></i>
+                            <strong>Tips:</strong>
+                            <ul class="mt-2 mb-0">
+                                <li>Always include dosage and frequency</li>
+                                <li>Specify duration of treatment</li>
+                                <li>Add special instructions if needed</li>
+                                <li>Mark controlled substances appropriately</li>
+                            </ul>
+                        </div>
+                        <hr>
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Note:</strong> Prescriptions are valid for 90 days from the date of issue.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-clock-history"></i> Quick Tips</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center">
+                            <i class="bi bi-prescription2 fs-1 text-primary"></i>
+                            <p class="mt-2 text-muted">
+                                - Write clearly<br>
+                                - Use generic names when possible<br>
+                                - Check for drug interactions<br>
+                                - Consider patient allergies
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Patient search functionality
+        const patientSearch = document.getElementById('patientSearch');
+        const patientSuggestions = document.getElementById('patientSuggestions');
+        const patientNameInput = document.getElementById('patientName');
+        const patientIdInput = document.getElementById('patientId');
+        
+        let patients = [];
+        
+        // Fetch patients from server
+        async function searchPatients(query) {
+            if (query.length < 2) return [];
+            try {
+                const response = await fetch(`/api/clinical/patients/search?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error fetching patients:', error);
+                return [];
+            }
+        }
+        
+        patientSearch.addEventListener('input', async function() {
+            const searchTerm = this.value.toLowerCase();
+            if (searchTerm.length < 2) {
+                patientSuggestions.style.display = 'none';
+                return;
+            }
+            
+            const matches = await searchPatients(searchTerm);
+            
+            if (matches.length > 0) {
+                patientSuggestions.innerHTML = matches.map(patient => `
+                    <div class="patient-suggestion-item" onclick="selectPatient('${patient.name}', '${patient.id}')">
+                        <strong>${patient.name}</strong>
+                        <br><small class="text-muted">ID: ${patient.patient_id} | Card: ${patient.card_number || 'N/A'}</small>
+                    </div>
+                `).join('');
+                patientSuggestions.style.display = 'block';
+            } else {
+                // Allow manual entry
+                patientSuggestions.innerHTML = `
+                    <div class="patient-suggestion-item" onclick="selectPatient('${searchTerm}', '')">
+                        <i class="bi bi-person-plus"></i> <strong>Add new patient: "${searchTerm}"</strong>
+                        <br><small class="text-muted">This will create a new patient record</small>
+                    </div>
+                `;
+                patientSuggestions.style.display = 'block';
+            }
+        });
+        
+        function selectPatient(name, id) {
+            patientSearch.value = name;
+            patientNameInput.value = name;
+            patientIdInput.value = id;
+            patientSuggestions.style.display = 'none';
+        }
+        
+        // Drug search functionality
+        const drugSearch = document.getElementById('drugSearch');
+        const drugSuggestions = document.getElementById('drugSuggestions');
+        const drugNameInput = document.getElementById('drugName');
+        const drugStrengthInput = document.getElementById('drugStrength');
+        
+        let drugs = [
+            {% for drug in drugs %}
+            {id: {{ drug.id }}, name: "{{ drug[1] }}", strength: "{{ drug[2] }}", price: {{ drug[3] }}, stock: {{ drug[4] }}},
+            {% endfor %}
+        ];
+        
+        drugSearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            if (searchTerm.length < 2) {
+                drugSuggestions.style.display = 'none';
+                return;
+            }
+            
+            const matches = drugs.filter(drug => 
+                drug.name.toLowerCase().includes(searchTerm) ||
+                drug.strength.toLowerCase().includes(searchTerm)
+            ).slice(0, 10);
+            
+            if (matches.length > 0) {
+                drugSuggestions.innerHTML = matches.map(drug => `
+                    <div class="drug-suggestion-item" onclick="selectDrug('${drug.name}', '${drug.strength}')">
+                        <strong>${drug.name}</strong> ${drug.strength} 
+                        <span class="text-muted">(Stock: ${drug.stock})</span>
+                    </div>
+                `).join('');
+                drugSuggestions.style.display = 'block';
+            } else {
+                drugSuggestions.innerHTML = `
+                    <div class="drug-suggestion-item" onclick="selectDrug('${searchTerm}', '')">
+                        <i class="bi bi-plus-circle"></i> Add "${searchTerm}" as custom drug
+                    </div>
+                `;
+                drugSuggestions.style.display = 'block';
+            }
+        });
+        
+        function selectDrug(name, strength) {
+            drugSearch.value = name;
+            drugNameInput.value = name;
+            drugStrengthInput.value = strength;
+            drugSuggestions.style.display = 'none';
+        }
+        
+        // Close suggestions when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!patientSearch.contains(e.target) && !patientSuggestions.contains(e.target)) {
+                patientSuggestions.style.display = 'none';
+            }
+            if (!drugSearch.contains(e.target) && !drugSuggestions.contains(e.target)) {
+                drugSuggestions.style.display = 'none';
+            }
+        });
+        
+        // Form validation
+        document.getElementById('prescriptionForm').addEventListener('submit', function(e) {
+            if (!patientNameInput.value) {
+                alert('Please enter a patient name');
+                e.preventDefault();
+                return false;
+            }
+            if (!drugNameInput.value) {
+                alert('Please select a drug');
+                e.preventDefault();
+                return false;
+            }
+        });
+    </script>
+</body>
+</html>

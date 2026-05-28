@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Prescription</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+            }
+            .prescription-box {
+                box-shadow: none;
+                border: 1px solid #ddd;
+            }
+        }
+        body { background: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .prescription-box {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            padding: 30px;
+            max-width: 800px;
+            margin: 20px auto;
+        }
+        .btn-print {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="prescription-box">
+        <div class="text-center mb-4">
+            <h3>John-Theresa Spiritan Specialist Hospital</h3>
+            <p>Uvuru, Nsukka, Enugu State<br>
+            <small>Tel: 080-XXX-XXXX | Email: info@jthospital.org</small></p>
+            <hr>
+            <h4>MEDICAL PRESCRIPTION</h4>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <p><strong>Prescription No:</strong> {{ prescription.prescription_no }}</p>
+                <p><strong>Date:</strong> {{ prescription.prescribed_date }}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Patient Name:</strong> {{ prescription.patient_name }}</p>
+                <p><strong>Doctor:</strong> Dr. {{ prescription.doctor_name }}</p>
+            </div>
+        </div>
+
+        <table class="table table-bordered">
+            <thead>
+                <tr style="background: #1e3c72; color: white;">
+                    <th>Medication</th>
+                    <th>Dosage</th>
+                    <th>Frequency</th>
+                    <th>Duration</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <strong>{{ prescription.drug_name }}</strong>
+                        {% if prescription.strength %}
+                            <br><small>{{ prescription.strength }}</small>
+                        {% endif %}
+                    </td>
+                    <td>{{ prescription.dosage }}</td>
+                    <td>{{ prescription.frequency }}</td>
+                    <td>{{ prescription.duration }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <p><strong>Quantity:</strong> {{ prescription.quantity }} unit(s)</p>
+                <p><strong>Refills:</strong> {{ prescription.refills }}</p>
+            </div>
+            <div class="col-md-6">
+                {% if prescription.is_controlled %}
+                    <p><span class="badge bg-warning">⚠ Controlled Substance</span></p>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if prescription.instructions %}
+        <div class="alert alert-info mt-3">
+            <strong>Instructions:</strong><br>
+            {{ prescription.instructions }}
+        </div>
+        {% endif %}
+
+        <div class="row mt-5 pt-3">
+            <div class="col-md-6">
+                <p>_________________________<br>
+                <small>Doctor's Signature</small></p>
+            </div>
+            <div class="col-md-6 text-end">
+                <p>_________________________<br>
+                <small>Patient's Signature</small></p>
+            </div>
+        </div>
+
+        <div class="text-muted mt-4 pt-3 border-top">
+            <small>
+                <i class="bi bi-calendar"></i> Expires: {{ prescription.expires_date }}<br>
+                <i class="bi bi-qr-code"></i> This is a computer-generated prescription. No signature required.
+            </small>
+        </div>
+    </div>
+
+    <div class="text-center no-print mt-3">
+        <button onclick="window.print();" class="btn-print">
+            <i class="bi bi-printer"></i> Print Prescription
+        </button>
+        <button onclick="window.close();" class="btn-print ms-2">
+            <i class="bi bi-x-circle"></i> Close
+        </button>
+    </div>
+</body>
+</html>

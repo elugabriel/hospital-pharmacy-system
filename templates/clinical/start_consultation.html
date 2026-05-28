@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Start Consultation</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { background: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .navbar { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); }
+        .card { border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border: none; margin-bottom: 20px; }
+        .card-header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; border-radius: 15px 15px 0 0; }
+        .btn-primary { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border: none; }
+        .form-label { font-weight: 600; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('clinical_dashboard') }}"><i class="bi bi-heart-pulse"></i> Start Consultation</a>
+            <div class="ms-auto">
+                <span class="text-white me-3">Dr. {{ session.get('clinical_username') }}</span>
+                <a href="{{ url_for('clinical_logout') }}" class="btn btn-danger btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Patient Info Card -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-person-badge"></i> Patient Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Name:</strong> {{ patient.first_name }} {{ patient.last_name }}</p>
+                        <p><strong>Patient ID:</strong> {{ patient.patient_id }}</p>
+                        <p><strong>Card Number:</strong> {{ patient.card_number or 'N/A' }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Date of Birth:</strong> {{ patient.date_of_birth }}</p>
+                        <p><strong>Gender:</strong> {{ patient.gender }}</p>
+                        <p><strong>Phone:</strong> {{ patient.phone or 'N/A' }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Consultation Form -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-pencil-square"></i> Consultation Notes</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-chat-dots"></i> Chief Complaint</label>
+                        <textarea name="chief_complaint" class="form-control" rows="2" required placeholder="What brought the patient in today?"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-clock-history"></i> History of Present Illness</label>
+                        <textarea name="history" class="form-control" rows="3" placeholder="Detailed description of the current illness..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-file-medical"></i> Past Medical History</label>
+                        <textarea name="past_history" class="form-control" rows="2" placeholder="Previous illnesses, surgeries, medications..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-stethoscope"></i> Physical Examination</label>
+                        <textarea name="examination" class="form-control" rows="3" placeholder="Vitals, physical findings..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-clipboard-check"></i> Diagnosis</label>
+                        <textarea name="diagnosis" class="form-control" rows="2" required placeholder="Primary and secondary diagnoses..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-capsule"></i> Treatment Plan</label>
+                        <textarea name="treatment" class="form-control" rows="3" placeholder="Medications, procedures, referrals..."></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="bi bi-calendar"></i> Follow-up Date</label>
+                            <input type="date" name="follow_up" class="form-control">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="bi bi-journal"></i> Additional Notes</label>
+                            <textarea name="notes" class="form-control" rows="2" placeholder="Any other relevant information..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="text-end">
+                        <a href="{{ url_for('clinical_dashboard') }}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save Consultation
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
