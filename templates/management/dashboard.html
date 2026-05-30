@@ -1,0 +1,213 @@
+{% extends "management/base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Executive Dashboard{% endblock %}
+{% block content %}
+
+<!-- Key Metrics Row -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <h3>{{ total_patients }}</h3>
+            <span>Total Active Patients</span>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <h3>{{ today_appointments }}</h3>
+            <span>Today's Appointments</span>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <h3>{{ total_staff }}</h3>
+            <span>Staff Members</span>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <h3>₦{{ "{:,.0f}".format(today_revenue) }}</h3>
+            <span>Today's Revenue</span>
+        </div>
+    </div>
+</div>
+
+<!-- Second Row Metrics -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="info-box">
+            <span class="info-icon"><i class="bi bi-calendar-plus"></i></span>
+            <div class="info-content">
+                <h4>{{ upcoming_appointments }}</h4>
+                <p>Upcoming Appointments</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="info-box">
+            <span class="info-icon"><i class="bi bi-person-plus"></i></span>
+            <div class="info-content">
+                <h4>{{ new_patients_today }}</h4>
+                <p>New Patients Today</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="info-box">
+            <span class="info-icon"><i class="bi bi-flask"></i></span>
+            <div class="info-content">
+                <h4>{{ pending_lab_requests }}</h4>
+                <p>Pending Lab Tests</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="info-box">
+            <span class="info-icon"><i class="bi bi-camera"></i></span>
+            <div class="info-content">
+                <h4>{{ pending_imaging }}</h4>
+                <p>Pending Imaging</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts and Recent Activity Row -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Revenue Trend (Last 7 Days)</div>
+            <div class="card-body">
+                <canvas id="revenueTrendChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Recent Payments</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light">
+                            <tr><th>Patient</th><th>Amount</th><th>Method</th><th>Date</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for payment in recent_payments %}
+                            <tr>
+                                <td>{{ payment.patient_name }}</td>
+                                <td>₦{{ "{:,.0f}".format(payment.amount_paid) }}</td>
+                                <td>{{ payment.payment_method }}</td>
+                                <td>{{ payment.payment_date }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="text-center">No recent payments</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Access Cards -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">Quick Access</div>
+            <div class="card-body">
+                <a href="{{ url_for('management_financial_reports') }}" class="btn btn-outline-primary m-1">Financial Reports</a>
+                <a href="{{ url_for('management_clinical_reports') }}" class="btn btn-outline-success m-1">Clinical Reports</a>
+                <a href="{{ url_for('management_operational_reports') }}" class="btn btn-outline-info m-1">Operational Reports</a>
+                <a href="{{ url_for('management_export_data') }}" class="btn btn-outline-secondary m-1">Export Data</a>
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add some CSS for info-boxes -->
+<style>
+    .info-box {
+        background: white;
+        border-radius: 12px;
+        padding: 15px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        transition: all 0.2s;
+    }
+    .info-box:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .info-icon {
+        font-size: 2rem;
+        color: #1e3c72;
+        width: 50px;
+        text-align: center;
+    }
+    .info-content h4 {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e3c72;
+    }
+    .info-content p {
+        margin: 0;
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .stat-card h3 {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1e3c72;
+        margin-bottom: 5px;
+    }
+    .stat-card span {
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Revenue trend chart
+    const ctx = document.getElementById('revenueTrendChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ revenue_labels|tojson }},
+            datasets: [{
+                label: 'Revenue (₦)',
+                data: {{ revenue_data|tojson }},
+                borderColor: '#1e3c72',
+                backgroundColor: 'rgba(30,60,114,0.05)',
+                borderWidth: 2,
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                fill: true,
+                tension: 0.2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { position: 'top', labels: { boxWidth: 10 } },
+                tooltip: { callbacks: { label: (ctx) => `₦${ctx.raw.toLocaleString()}` } }
+            },
+            scales: {
+                y: { beginAtZero: true, ticks: { callback: (v) => '₦' + v.toLocaleString() } }
+            }
+        }
+    });
+</script>
+{% endblock %}

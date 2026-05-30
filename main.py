@@ -10,7 +10,8 @@ import json
 import io
 import bcrypt
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
+from openpyxl.styles import Font 
+from flask import make_response
 
 # -------------------- FLASK APP SETUP --------------------
 app = Flask(__name__)
@@ -102,6 +103,7 @@ def update_prescriptions_table():
 def create_tables():
     """Create all necessary tables if they don't exist."""
     queries = {
+                
         "patients": """
             CREATE TABLE IF NOT EXISTS patients (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -761,6 +763,54 @@ def create_tables():
                 specialization VARCHAR(100),
                 license_number VARCHAR(50),
                 role VARCHAR(50) DEFAULT 'Doctor',
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+        "radiology_users": """
+            CREATE TABLE IF NOT EXISTS radiology_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                full_name VARCHAR(100) NOT NULL,
+                role VARCHAR(50) DEFAULT 'Technologist',
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+
+        "imaging_orders": """
+            CREATE TABLE IF NOT EXISTS imaging_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_no VARCHAR(50) UNIQUE NOT NULL,
+                patient_id INTEGER,
+                patient_name VARCHAR(200) NOT NULL,
+                doctor_id INTEGER NOT NULL,
+                doctor_name VARCHAR(100) NOT NULL,
+                imaging_type VARCHAR(100) NOT NULL,
+                body_part VARCHAR(100) NOT NULL,
+                urgency VARCHAR(20) DEFAULT 'Routine',
+                clinical_indication TEXT,
+                status VARCHAR(20) DEFAULT 'Pending',
+                ordered_date DATE NOT NULL,
+                ordered_time TIME NOT NULL,
+                performed_date DATE,
+                performed_by VARCHAR(100),
+                report TEXT,
+                report_date DATE,
+                report_approved_by VARCHAR(100),
+                images_stored TEXT,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
+        "management_users": """
+            CREATE TABLE IF NOT EXISTS management_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                full_name VARCHAR(100) NOT NULL,
+                role VARCHAR(50) DEFAULT 'Manager',
                 is_active BOOLEAN DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -2700,6 +2750,8 @@ def view_payment_receipt(payment_id):
 
     return render_template("payment_receipt.html", payment=payment, datetime=datetime)
 
+
+
 # -------------------- ROUTES: BILLING MODULE - PAYMENT HISTORY --------------------
 
 @app.route("/billing/payment-history")
@@ -2833,6 +2885,34 @@ def payment_history():
         total_pages=total_pages,
         current_filters=request.args
     )
+
+
+@app.route('/billing/api/today-collection')
+def api_today_collection():
+    """Return today's total collections and transaction count."""
+    if 'billing_user_id' not in session:
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    today = date.today().isoformat()
+    
+    # Sum of amount_paid for today
+    cur.execute("SELECT COALESCE(SUM(amount_paid), 0) FROM payments WHERE payment_date = ?", (today,))
+    total = cur.fetchone()[0]
+    
+    # Count of transactions today
+    cur.execute("SELECT COUNT(*) FROM payments WHERE payment_date = ?", (today,))
+    count = cur.fetchone()[0]
+    
+    cur.close()
+    conn.close()
+    
+    return jsonify({
+        "success": True,
+        "total_collected": float(total),
+        "transaction_count": count
+    })
 
 @app.route("/billing/payment-history/export")
 def export_payment_history():
@@ -7747,29 +7827,6 @@ def clinical_consultation_history():
     return redirect(url_for('clinical_dashboard'))
 
 
-
-
-@app.route('/clinical/order-lab')
-def clinical_order_lab():
-    if 'clinical_user_id' not in session:
-        return redirect(url_for('clinical_login'))
-    flash("Lab order feature coming soon!", "info")
-    return redirect(url_for('clinical_dashboard'))
-
-@app.route('/clinical/order-imaging')
-def clinical_order_imaging():
-    if 'clinical_user_id' not in session:
-        return redirect(url_for('clinical_login'))
-    flash("Imaging order feature coming soon!", "info")
-    return redirect(url_for('clinical_dashboard'))
-
-@app.route('/clinical/notes')
-def clinical_notes():
-    if 'clinical_user_id' not in session:
-        return redirect(url_for('clinical_login'))
-    flash("Clinical notes feature coming soon!", "info")
-    return redirect(url_for('clinical_dashboard'))
-
 @app.route('/clinical/lab-results')
 def clinical_lab_results():
     if 'clinical_user_id' not in session:
@@ -8253,6 +8310,1179 @@ def api_clinical_prescription_delete(prescription_id):
     finally:
         cur.close()
         conn.close()
+        
+@app.route('/clinical/order-lab', methods=['GET', 'POST'])
+def clinical_order_lab():
+    """Order laboratory tests for a patient"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    from datetime import date as date_today
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Get available lab tests (without price)
+    cur.execute("""
+        SELECT id, test_id, test_name, category, turnaround_time, normal_range
+        FROM lab_tests 
+        WHERE is_active = 1
+        ORDER BY category, test_name
+    """)
+    lab_tests = cur.fetchall()
+    
+    # Group tests by category
+    tests_by_category = {}
+    for test in lab_tests:
+        category = test[3] or 'Other'
+        if category not in tests_by_category:
+            tests_by_category[category] = []
+        tests_by_category[category].append({
+            'id': test[0],
+            'test_id': test[1],
+            'name': test[2],
+            'turnaround': test[4],
+            'normal_range': test[5]
+        })
+    
+    if request.method == 'POST':
+        patient_name = request.form.get('patient_name')
+        patient_id_input = request.form.get('patient_id')
+        selected_tests = request.form.getlist('selected_tests')
+        manual_tests_str = request.form.get('manual_tests', '')
+        priority = request.form.get('priority', 'Normal')
+        clinical_notes = request.form.get('clinical_notes')
+        diagnosis = request.form.get('diagnosis')
+        
+        if not patient_name:
+            flash("Patient name is required", "danger")
+            cur.close()
+            conn.close()
+            return redirect(url_for('clinical_order_lab'))
+        
+        # Parse manual tests
+        manual_tests = [t.strip() for t in manual_tests_str.split('|') if t.strip()]
+        
+        if not selected_tests and not manual_tests:
+            flash("Please select at least one test", "danger")
+            cur.close()
+            conn.close()
+            return redirect(url_for('clinical_order_lab'))
+        
+        # Get test details for selected tests
+        test_ids = []
+        test_names = []
+        
+        if selected_tests:
+            placeholders = ','.join(['?' for _ in selected_tests])
+            cur.execute(f"""
+                SELECT id, test_name
+                FROM lab_tests 
+                WHERE id IN ({placeholders}) AND is_active = 1
+            """, selected_tests)
+            tests = cur.fetchall()
+            for test in tests:
+                test_ids.append(str(test[0]))
+                test_names.append(test[1])
+        
+        # Add manual tests
+        for manual_test in manual_tests:
+            test_names.append(f"[CUSTOM] {manual_test}")
+        
+        # Generate unique request number
+        request_no = f"LAB-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
+        
+        # Handle patient_id - try to find existing patient
+        actual_patient_id = None
+        if patient_id_input and patient_id_input != '':
+            actual_patient_id = patient_id_input
+        else:
+            # Try to find patient by name
+            name_parts = patient_name.strip().split(' ', 1)
+            first_name = name_parts[0]
+            last_name = name_parts[1] if len(name_parts) > 1 else ''
+            cur.execute("SELECT id FROM patients WHERE first_name = ? AND last_name = ?", (first_name, last_name))
+            existing = cur.fetchone()
+            if existing:
+                actual_patient_id = existing[0]
+        
+        try:
+            cur.execute("""
+                INSERT INTO lab_requests (
+                    request_no, patient_name, patient_id, doctor_name,
+                    test_ids, test_names, total_amount, discount, grand_total,
+                    priority, notes, requested_date, created_by, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')
+            """, (
+                request_no, patient_name, actual_patient_id, session['clinical_name'],
+                ','.join(test_ids), ','.join(test_names), 0, 0, 0,
+                priority, f"Clinical Notes: {clinical_notes}\nDiagnosis: {diagnosis}" if clinical_notes or diagnosis else None,
+                date_today.today().isoformat(), session['clinical_user_id']
+            ))
+            
+            conn.commit()
+            lab_request_id = cur.lastrowid
+            flash(f"Lab request {request_no} submitted successfully! Tests: {len(test_names)}", "success")
+            cur.close()
+            conn.close()
+            return redirect(url_for('clinical_lab_request_view', request_id=lab_request_id))
+            
+        except Exception as e:
+            conn.rollback()
+            app.logger.error(f"Error creating lab request: {e}")
+            flash(f"Error creating lab request: {str(e)}", "danger")
+    
+    cur.close()
+    conn.close()
+    
+    return render_template("clinical/order_lab.html",
+                         tests_by_category=tests_by_category,
+                         today_date=date_today.today().strftime("%A, %B %d, %Y"))
+    
+        
+@app.route('/clinical/lab-requests')
+def clinical_lab_requests():
+    """View all lab requests by the doctor"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT id, request_no, patient_name, test_names, total_amount, 
+               grand_total, status, priority, requested_date
+        FROM lab_requests 
+        WHERE doctor_name = ?
+        ORDER BY requested_date DESC
+        LIMIT 100
+    """, (session['clinical_name'],))
+    
+    requests = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return render_template("clinical/lab_requests_list.html", requests=requests)
+
+@app.route('/clinical/lab-request/<int:request_id>')
+def clinical_lab_request_view(request_id):
+    """View a specific lab request"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT * FROM lab_requests 
+        WHERE id = ? AND doctor_name = ?
+    """, (request_id, session['clinical_name']))
+    
+    lab_request = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if not lab_request:
+        flash("Lab request not found", "danger")
+        return redirect(url_for('clinical_lab_requests'))
+    
+    return render_template("clinical/lab_request_view.html", request=lab_request)
+
+@app.route('/clinical/notes', methods=['GET', 'POST'])
+def clinical_notes():
+    """Manage clinical notes for patients"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    from datetime import date as date_today
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'save_note':
+            patient_name = request.form.get('patient_name')
+            patient_id_input = request.form.get('patient_id')
+            note_type = request.form.get('note_type')
+            subjective = request.form.get('subjective')
+            objective = request.form.get('objective')
+            assessment = request.form.get('assessment')
+            plan = request.form.get('plan')
+            is_private = request.form.get('is_private', '0')
+            
+            if not patient_name or not subjective:
+                flash("Patient name and subjective findings are required", "danger")
+                return redirect(url_for('clinical_notes'))
+            
+            # Generate note number
+            note_no = f"NOTE-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
+            
+            # Handle patient_id
+            actual_patient_id = None
+            if patient_id_input and patient_id_input != '':
+                actual_patient_id = patient_id_input
+            else:
+                # Try to find patient by name
+                name_parts = patient_name.strip().split(' ', 1)
+                first_name = name_parts[0]
+                last_name = name_parts[1] if len(name_parts) > 1 else ''
+                cur.execute("SELECT id FROM patients WHERE first_name = ? AND last_name = ?", (first_name, last_name))
+                existing = cur.fetchone()
+                if existing:
+                    actual_patient_id = existing[0]
+            
+            try:
+                cur.execute("""
+                    INSERT INTO clinical_notes (
+                        note_no, patient_id, patient_name, doctor_id, doctor_name,
+                        note_type, subjective, objective, assessment, plan,
+                        note_date, note_time, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Final')
+                """, (
+                    note_no, actual_patient_id, patient_name, session['clinical_user_id'],
+                    session['clinical_name'], note_type, subjective, objective, assessment, plan,
+                    date_today.today().isoformat(), datetime.now().strftime('%H:%M:%S')
+                ))
+                
+                conn.commit()
+                flash(f"Clinical note saved successfully! Note No: {note_no}", "success")
+                return redirect(url_for('clinical_note_view', note_id=cur.lastrowid))
+                
+            except Exception as e:
+                conn.rollback()
+                app.logger.error(f"Error saving clinical note: {e}")
+                flash(f"Error saving note: {str(e)}", "danger")
+        
+        elif action == 'update_note':
+            note_id = request.form.get('note_id')
+            subjective = request.form.get('subjective')
+            objective = request.form.get('objective')
+            assessment = request.form.get('assessment')
+            plan = request.form.get('plan')
+            
+            try:
+                cur.execute("""
+                    UPDATE clinical_notes 
+                    SET subjective = ?, objective = ?, assessment = ?, plan = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND doctor_id = ?
+                """, (subjective, objective, assessment, plan, note_id, session['clinical_user_id']))
+                
+                conn.commit()
+                flash("Clinical note updated successfully!", "success")
+                return redirect(url_for('clinical_note_view', note_id=note_id))
+                
+            except Exception as e:
+                conn.rollback()
+                app.logger.error(f"Error updating clinical note: {e}")
+                flash(f"Error updating note: {str(e)}", "danger")
+        
+        elif action == 'delete_note':
+            note_id = request.form.get('note_id')
+            
+            try:
+                cur.execute("DELETE FROM clinical_notes WHERE id = ? AND doctor_id = ?", 
+                           (note_id, session['clinical_user_id']))
+                conn.commit()
+                flash("Clinical note deleted successfully!", "success")
+                return redirect(url_for('clinical_notes'))
+                
+            except Exception as e:
+                conn.rollback()
+                app.logger.error(f"Error deleting clinical note: {e}")
+                flash(f"Error deleting note: {str(e)}", "danger")
+    
+    # GET request - get all notes for this doctor
+    cur.execute("""
+        SELECT id, note_no, patient_name, note_type, note_date, 
+               subjective, assessment, created_at
+        FROM clinical_notes 
+        WHERE doctor_id = ?
+        ORDER BY note_date DESC, created_at DESC
+        LIMIT 100
+    """, (session['clinical_user_id'],))
+    
+    notes = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return render_template("clinical/notes_list.html", 
+                         notes=notes,
+                         today_date=date_today.today().strftime("%A, %B %d, %Y"))
+
+@app.route('/clinical/notes/new')
+def clinical_note_new():
+    """Create a new clinical note"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    from datetime import date as date_today
+    
+    return render_template("clinical/note_form.html",
+                         today_date=date_today.today().strftime("%A, %B %d, %Y"),
+                         note=None)
+
+@app.route('/clinical/notes/<int:note_id>')
+def clinical_note_view(note_id):
+    """View a specific clinical note"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT * FROM clinical_notes 
+        WHERE id = ? AND doctor_id = ?
+    """, (note_id, session['clinical_user_id']))
+    
+    note = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if not note:
+        flash("Clinical note not found", "danger")
+        return redirect(url_for('clinical_notes'))
+    
+    return render_template("clinical/note_view.html", note=note)
+
+@app.route('/clinical/notes/<int:note_id>/edit')
+def clinical_note_edit(note_id):
+    """Edit a clinical note"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    from datetime import date as date_today
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT * FROM clinical_notes 
+        WHERE id = ? AND doctor_id = ?
+    """, (note_id, session['clinical_user_id']))
+    
+    note = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if not note:
+        flash("Clinical note not found", "danger")
+        return redirect(url_for('clinical_notes'))
+    
+    return render_template("clinical/note_form.html",
+                         today_date=date_today.today().strftime("%A, %B %d, %Y"),
+                         note=note)
+
+@app.route('/api/clinical/notes/search')
+def api_clinical_notes_search():
+    """API endpoint to search clinical notes"""
+    if 'clinical_user_id' not in session:
+        return jsonify([])
+    
+    search_term = request.args.get('q', '')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT id, note_no, patient_name, note_type, note_date, 
+               subjective, assessment
+        FROM clinical_notes 
+        WHERE doctor_id = ?
+        AND (patient_name LIKE ? OR subjective LIKE ? OR assessment LIKE ?)
+        ORDER BY note_date DESC
+        LIMIT 50
+    """, (session['clinical_user_id'], f'%{search_term}%', f'%{search_term}%', f'%{search_term}%'))
+    
+    notes = []
+    for row in cur.fetchall():
+        notes.append({
+            'id': row[0],
+            'note_no': row[1],
+            'patient_name': row[2],
+            'note_type': row[3],
+            'note_date': row[4],
+            'subjective': row[5][:100] if row[5] else '',
+            'assessment': row[6][:100] if row[6] else ''
+        })
+    
+    cur.close()
+    conn.close()
+    
+    return jsonify(notes)
+
+@app.route('/clinical/patient-notes/<int:patient_id>')
+def clinical_patient_notes(patient_id):
+    """View all notes for a specific patient"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Get patient info
+    cur.execute("SELECT first_name, last_name, patient_id FROM patients WHERE id = ?", (patient_id,))
+    patient = cur.fetchone()
+    
+    if not patient:
+        flash("Patient not found", "danger")
+        return redirect(url_for('clinical_notes'))
+    
+    # Get patient notes
+    cur.execute("""
+        SELECT id, note_no, note_type, note_date, subjective, assessment, plan
+        FROM clinical_notes 
+        WHERE patient_id = ? AND doctor_id = ?
+        ORDER BY note_date DESC
+    """, (patient_id, session['clinical_user_id']))
+    
+    notes = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    patient_name = f"{patient[0]} {patient[1]}"
+    
+    return render_template("clinical/patient_notes.html", 
+                         notes=notes, 
+                         patient=patient,
+                         patient_name=patient_name)
+    
+    
+@app.route('/clinical/order-imaging', methods=['GET', 'POST'])
+def clinical_order_imaging():
+    """Order imaging/radiology studies for a patient"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    from datetime import date as date_today
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Predefined imaging types
+    imaging_types = [
+        'X-Ray', 'CT Scan', 'MRI', 'Ultrasound', 'Mammogram',
+        'Fluoroscopy', 'PET Scan', 'Nuclear Medicine', 'DEXA Scan',
+        'Angiography', 'Doppler Study', 'Echocardiogram'
+    ]
+    
+    # Body parts list
+    body_parts = [
+        'Head', 'Neck', 'Chest', 'Abdomen', 'Pelvis', 'Spine',
+        'Upper Extremity', 'Lower Extremity', 'Knee', 'Shoulder',
+        'Hip', 'Ankle', 'Wrist', 'Elbow', 'Hand', 'Foot'
+    ]
+    
+    if request.method == 'POST':
+        patient_name = request.form.get('patient_name')
+        patient_id_input = request.form.get('patient_id')
+        imaging_type = request.form.get('imaging_type')
+        custom_imaging = request.form.get('custom_imaging', '').strip()
+        body_part = request.form.get('body_part')
+        custom_body_part = request.form.get('custom_body_part', '').strip()
+        urgency = request.form.get('urgency', 'Routine')
+        clinical_indication = request.form.get('clinical_indication')
+        notes = request.form.get('notes')
+        
+        # Determine final imaging type and body part
+        final_imaging_type = custom_imaging if custom_imaging else imaging_type
+        final_body_part = custom_body_part if custom_body_part else body_part
+        
+        if not patient_name:
+            flash("Patient name is required", "danger")
+            return redirect(url_for('clinical_order_imaging'))
+        
+        if not final_imaging_type:
+            flash("Please select or enter an imaging type", "danger")
+            return redirect(url_for('clinical_order_imaging'))
+        
+        if not final_body_part:
+            flash("Please select or enter a body part", "danger")
+            return redirect(url_for('clinical_order_imaging'))
+        
+        # Generate order number
+        order_no = f"IMG-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
+        
+        # Handle patient_id
+        actual_patient_id = None
+        if patient_id_input and patient_id_input != '':
+            actual_patient_id = patient_id_input
+        else:
+            name_parts = patient_name.strip().split(' ', 1)
+            first_name = name_parts[0]
+            last_name = name_parts[1] if len(name_parts) > 1 else ''
+            cur.execute("SELECT id FROM patients WHERE first_name = ? AND last_name = ?", (first_name, last_name))
+            existing = cur.fetchone()
+            if existing:
+                actual_patient_id = existing[0]
+        
+        try:
+            cur.execute("""
+                INSERT INTO imaging_orders (
+                    order_no, patient_id, patient_name, doctor_id, doctor_name,
+                    imaging_type, body_part, urgency, clinical_indication, status,
+                    ordered_date, ordered_time, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?, ?)
+            """, (
+                order_no, actual_patient_id, patient_name, session['clinical_user_id'],
+                session['clinical_name'], final_imaging_type, final_body_part, urgency,
+                clinical_indication, date_today.today().isoformat(),
+                datetime.now().strftime('%H:%M:%S'), notes
+            ))
+            
+            conn.commit()
+            order_id = cur.lastrowid
+            flash(f"Imaging order {order_no} submitted successfully!", "success")
+            return redirect(url_for('clinical_imaging_view', order_id=order_id))
+            
+        except Exception as e:
+            conn.rollback()
+            app.logger.error(f"Error creating imaging order: {e}")
+            flash(f"Error creating order: {str(e)}", "danger")
+    
+    cur.close()
+    conn.close()
+    
+    return render_template("clinical/order_imaging.html",
+                         imaging_types=imaging_types,
+                         body_parts=body_parts,
+                         today_date=date_today.today().strftime("%A, %B %d, %Y"))
+
+@app.route('/clinical/imaging-requests')
+def clinical_imaging_requests():
+    """List all imaging orders by the doctor"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT id, order_no, patient_name, imaging_type, body_part, urgency, status, ordered_date
+        FROM imaging_orders 
+        WHERE doctor_id = ?
+        ORDER BY ordered_date DESC
+        LIMIT 100
+    """, (session['clinical_user_id'],))
+    
+    orders = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return render_template("clinical/imaging_requests.html", orders=orders)
+
+@app.route('/clinical/imaging/<int:order_id>')
+def clinical_imaging_view(order_id):
+    """View a specific imaging order"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT * FROM imaging_orders 
+        WHERE id = ? AND doctor_id = ?
+    """, (order_id, session['clinical_user_id']))
+    
+    order = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if not order:
+        flash("Imaging order not found", "danger")
+        return redirect(url_for('clinical_imaging_requests'))
+    
+    return render_template("clinical/imaging_view.html", order=order)
+
+@app.route('/clinical/imaging/<int:order_id>/print')
+def clinical_imaging_print(order_id):
+    """Print an imaging order"""
+    if 'clinical_user_id' not in session:
+        return redirect(url_for('clinical_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT * FROM imaging_orders 
+        WHERE id = ? AND doctor_id = ?
+    """, (order_id, session['clinical_user_id']))
+    
+    order = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if not order:
+        flash("Imaging order not found", "danger")
+        return redirect(url_for('clinical_imaging_requests'))
+    
+    return render_template("clinical/imaging_print.html", order=order)
+
+
+#============================Radiography Route ==============================================
+@app.route('/radiology/login', methods=['GET', 'POST'])
+def radiology_login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT id, username, password, full_name, role FROM radiology_users WHERE username=? AND is_active=1", (username,))
+        user = cur.fetchone()
+        cur.close()
+        conn.close()
+        if user and check_password_hash(user[2], password):
+            session['radiology_user_id'] = user[0]
+            session['radiology_username'] = user[1]
+            session['radiology_full_name'] = user[3]
+            session['radiology_role'] = user[4]
+            return redirect(url_for('radiology_dashboard'))
+        else:
+            flash("Invalid credentials", "danger")
+    return render_template("radiology/login.html")
+
+@app.route('/radiology/dashboard')
+def radiology_dashboard():
+    if 'radiology_user_id' not in session:
+        return redirect(url_for('radiology_login'))
+    conn = get_db_connection()
+    cur = conn.cursor()
+    # Count pending, in progress, completed orders
+    cur.execute("SELECT COUNT(*) FROM imaging_orders WHERE status='Pending'")
+    pending = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) FROM imaging_orders WHERE status='In Progress'")
+    in_progress = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) FROM imaging_orders WHERE status='Completed' AND DATE(performed_date)=DATE('now')")
+    completed_today = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) FROM imaging_orders WHERE DATE(ordered_date)=DATE('now')")
+    ordered_today = cur.fetchone()[0] or 0
+    # Recent orders
+    cur.execute("SELECT id, order_no, patient_name, imaging_type, body_part, urgency, status, ordered_date FROM imaging_orders ORDER BY ordered_date DESC LIMIT 10")
+    recent_orders = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template("radiology/dashboard.html",
+                         pending=pending,
+                         in_progress=in_progress,
+                         completed_today=completed_today,
+                         ordered_today=ordered_today,
+                         recent_orders=recent_orders,
+                         user_name=session.get('radiology_full_name'))
+    
+    
+@app.route('/radiology/orders')
+def radiology_orders():
+    if 'radiology_user_id' not in session:
+        return redirect(url_for('radiology_login'))
+    status_filter = request.args.get('status', '')
+    conn = get_db_connection()
+    cur = conn.cursor()
+    query = "SELECT * FROM imaging_orders WHERE 1=1"
+    params = []
+    if status_filter:
+        query += " AND status = ?"
+        params.append(status_filter)
+    query += " ORDER BY urgency DESC, ordered_date DESC"
+    cur.execute(query, params)
+    orders = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template("radiology/orders.html", orders=orders, status_filter=status_filter)
+
+
+@app.route('/radiology/order/<int:order_id>', methods=['GET', 'POST'])
+def radiology_order_detail(order_id):
+    if 'radiology_user_id' not in session:
+        return redirect(url_for('radiology_login'))
+    conn = get_db_connection()
+    cur = conn.cursor()
+    if request.method == 'POST':
+        status = request.form.get('status')
+        report = request.form.get('report')
+        performed_date = request.form.get('performed_date') if request.form.get('performed_date') else None
+        # Update imaging order
+        cur.execute("""
+            UPDATE imaging_orders
+            SET status=?, report=?, performed_date=?, performed_by=?, report_date=CURRENT_DATE
+            WHERE id=?
+        """, (status, report, performed_date, session['radiology_full_name'], order_id))
+        conn.commit()
+        flash("Order updated successfully", "success")
+        return redirect(url_for('radiology_orders'))
+    # GET: fetch order details
+    cur.execute("SELECT * FROM imaging_orders WHERE id=?", (order_id,))
+    order = cur.fetchone()
+    cur.close()
+    conn.close()
+    if not order:
+        flash("Order not found", "danger")
+        return redirect(url_for('radiology_orders'))
+    return render_template("radiology/order_detail.html", order=order)
+
+
+@app.route('/radiology/reports')
+def radiology_reports():
+    if 'radiology_user_id' not in session:
+        return redirect(url_for('radiology_login'))
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id, order_no, patient_name, imaging_type, report_date, report FROM imaging_orders WHERE status='Completed' ORDER BY report_date DESC LIMIT 50")
+    reports = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template("radiology/reports.html", reports=reports)
+
+
+@app.route('/radiology/logout')
+def radiology_logout():
+    session.pop('radiology_user_id', None)
+    session.pop('radiology_username', None)
+    session.pop('radiology_full_name', None)
+    session.pop('radiology_role', None)
+    flash("Logged out", "success")
+    return redirect(url_for('radiology_login'))
+
+
+def create_default_radiology_user():
+    """Create default radiology user if none exists."""
+    conn = get_db_connection()
+    if not conn:
+        return
+    cursor = conn.cursor()
+    # Check if radiology_users table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='radiology_users'")
+    if not cursor.fetchone():
+        cursor.close()
+        conn.close()
+        return
+    cursor.execute("SELECT COUNT(*) FROM radiology_users")
+    count = cursor.fetchone()[0]
+    if count == 0:
+        from werkzeug.security import generate_password_hash
+        hashed_pw = generate_password_hash('radio123')
+        cursor.execute("""
+            INSERT INTO radiology_users (username, password, full_name, role, is_active)
+            VALUES (?, ?, ?, ?, 1)
+        """, ('radiologist1', hashed_pw, 'Radiologist', 'Radiologist'))
+        conn.commit()
+        print("Created default radiology user: radiologist1 / radio123")
+    cursor.close()
+    conn.close()
+    
+def update_imaging_orders_table():
+    """Add missing columns to imaging_orders table"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Check if table exists
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='imaging_orders'")
+    if cur.fetchone():
+        # Get existing columns
+        cur.execute("PRAGMA table_info(imaging_orders)")
+        existing_columns = [col[1] for col in cur.fetchall()]
+        
+        # Add missing columns
+        if 'report' not in existing_columns:
+            cur.execute("ALTER TABLE imaging_orders ADD COLUMN report TEXT")
+            print("Added 'report' column to imaging_orders")
+        
+        if 'performed_date' not in existing_columns:
+            cur.execute("ALTER TABLE imaging_orders ADD COLUMN performed_date DATE")
+            print("Added 'performed_date' column to imaging_orders")
+        
+        if 'performed_by' not in existing_columns:
+            cur.execute("ALTER TABLE imaging_orders ADD COLUMN performed_by VARCHAR(100)")
+            print("Added 'performed_by' column to imaging_orders")
+        
+        if 'report_date' not in existing_columns:
+            cur.execute("ALTER TABLE imaging_orders ADD COLUMN report_date DATE")
+            print("Added 'report_date' column to imaging_orders")
+        
+        if 'report_approved_by' not in existing_columns:
+            cur.execute("ALTER TABLE imaging_orders ADD COLUMN report_approved_by VARCHAR(100)")
+            print("Added 'report_approved_by' column to imaging_orders")
+        
+        if 'images_stored' not in existing_columns:
+            cur.execute("ALTER TABLE imaging_orders ADD COLUMN images_stored TEXT")
+            print("Added 'images_stored' column to imaging_orders")
+        
+        conn.commit()
+    else:
+        print("imaging_orders table does not exist yet - will be created by create_tables()")
+    
+    cur.close()
+    conn.close()
+
+
+@app.route('/fix-imaging-table')
+def fix_imaging_table():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("ALTER TABLE imaging_orders ADD COLUMN report TEXT")
+    except: pass
+    try:
+        cur.execute("ALTER TABLE imaging_orders ADD COLUMN performed_date DATE")
+    except: pass
+    try:
+        cur.execute("ALTER TABLE imaging_orders ADD COLUMN performed_by VARCHAR(100)")
+    except: pass
+    try:
+        cur.execute("ALTER TABLE imaging_orders ADD COLUMN report_date DATE")
+    except: pass
+    try:
+        cur.execute("ALTER TABLE imaging_orders ADD COLUMN report_approved_by VARCHAR(100)")
+    except: pass
+    try:
+        cur.execute("ALTER TABLE imaging_orders ADD COLUMN images_stored TEXT")
+    except: pass
+    conn.commit()
+    cur.close()
+    conn.close()
+    return "Table updated successfully"
+
+def add_missing_imaging_columns():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    for col in ['report', 'performed_date', 'performed_by', 'report_date']:
+        try:
+            cur.execute(f"ALTER TABLE imaging_orders ADD COLUMN {col} TEXT")
+        except: pass
+    conn.commit()
+    cur.close()
+    conn.close()
+    
+    
+    
+# ==================== MANAGEMENT MODULE ====================
+
+@app.route('/management/login', methods=['GET', 'POST'])
+def management_login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT id, username, password, full_name, role FROM management_users WHERE username=? AND is_active=1", (username,))
+        user = cur.fetchone()
+        cur.close()
+        conn.close()
+        if user and check_password_hash(user[2], password):
+            session['management_user_id'] = user[0]
+            session['management_username'] = user[1]
+            session['management_full_name'] = user[3]
+            session['management_role'] = user[4]
+            return redirect(url_for('management_dashboard'))
+        else:
+            flash("Invalid credentials", "danger")
+    return render_template("management/login.html")
+
+@app.route('/management/dashboard')
+def management_dashboard():
+    if 'management_user_id' not in session:
+        return redirect(url_for('management_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Existing metrics
+    cur.execute("SELECT COUNT(*) FROM patients WHERE status='Active'")
+    total_patients = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) FROM appointments WHERE appointment_date = date('now')")
+    today_appointments = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) FROM staff WHERE status='Active'")
+    total_staff = cur.fetchone()[0] or 0
+    cur.execute("SELECT COALESCE(SUM(amount_paid), 0) FROM payments WHERE payment_date = date('now')")
+    today_revenue = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) FROM consultations WHERE status='Completed' AND DATE(completed_at) = date('now')")
+    today_consultations = cur.fetchone()[0] or 0
+    
+    # Additional metrics
+    cur.execute("SELECT COUNT(*) FROM appointments WHERE appointment_date > date('now')")
+    upcoming_appointments = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) FROM patients WHERE registration_date = date('now')")
+    new_patients_today = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) FROM lab_requests WHERE status='Pending'")
+    pending_lab_requests = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) FROM imaging_orders WHERE status='Pending'")
+    pending_imaging = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) FROM prescriptions WHERE status='Active' AND expires_date >= date('now')")
+    active_prescriptions = cur.fetchone()[0] or 0
+    
+    # Revenue trend last 7 days for chart
+    revenue_labels = []
+    revenue_data = []
+    today = date.today()
+    for i in range(6, -1, -1):
+        d = today - timedelta(days=i)
+        cur.execute("SELECT COALESCE(SUM(amount_paid), 0) FROM payments WHERE payment_date = ?", (d.isoformat(),))
+        revenue_data.append(float(cur.fetchone()[0]))
+        revenue_labels.append(d.strftime("%a"))
+    
+    # Recent payments (last 5)
+    cur.execute("""
+        SELECT id, patient_name, amount_paid, payment_method, payment_date 
+        FROM payments 
+        ORDER BY payment_date DESC, id DESC 
+        LIMIT 5
+    """)
+    recent_payments = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    
+    return render_template("management/dashboard.html",
+                         total_patients=total_patients,
+                         today_appointments=today_appointments,
+                         total_staff=total_staff,
+                         today_revenue=today_revenue,
+                         today_consultations=today_consultations,
+                         upcoming_appointments=upcoming_appointments,
+                         new_patients_today=new_patients_today,
+                         pending_lab_requests=pending_lab_requests,
+                         pending_imaging=pending_imaging,
+                         active_prescriptions=active_prescriptions,
+                         revenue_labels=revenue_labels,
+                         revenue_data=revenue_data,
+                         recent_payments=recent_payments,
+                         user_name=session.get('management_full_name'))
+    
+    
+@app.route('/management/financial-reports')
+def management_financial_reports():
+    if 'management_user_id' not in session:
+        return redirect(url_for('management_login'))
+    
+    period = request.args.get('period', 'monthly')  # daily, weekly, monthly
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Base data: payment methods (always shown)
+    cur.execute("""
+        SELECT payment_method, COALESCE(SUM(amount_paid), 0) as total
+        FROM payments
+        GROUP BY payment_method
+        ORDER BY total DESC
+    """)
+    payment_methods = cur.fetchall()
+    
+    # Revenue data based on period
+    labels = []
+    revenue_data = []
+    
+    today = date.today()
+    
+    if period == 'daily':
+        # Last 7 days
+        for i in range(6, -1, -1):
+            d = today - timedelta(days=i)
+            date_str = d.isoformat()
+            cur.execute("SELECT COALESCE(SUM(amount_paid), 0) FROM payments WHERE payment_date = ?", (date_str,))
+            total = cur.fetchone()[0]
+            labels.append(d.strftime("%a, %d %b"))
+            revenue_data.append(float(total))
+    elif period == 'weekly':
+        # Last 6 weeks (starting from current week's Monday)
+        # Find Monday of current week
+        start_of_week = today - timedelta(days=today.weekday())
+        for i in range(5, -1, -1):
+            week_start = start_of_week - timedelta(weeks=i)
+            week_end = week_start + timedelta(days=6)
+            # Use SQLite strftime to extract week number? Simpler: sum between dates
+            cur.execute("""
+                SELECT COALESCE(SUM(amount_paid), 0) FROM payments 
+                WHERE payment_date BETWEEN ? AND ?
+            """, (week_start.isoformat(), week_end.isoformat()))
+            total = cur.fetchone()[0]
+            labels.append(f"Week {week_start.strftime('%d/%m')} - {week_end.strftime('%d/%m')}")
+            revenue_data.append(float(total))
+    else:  # monthly
+        # Last 12 months
+        for i in range(11, -1, -1):
+            month = today.month - i
+            year = today.year
+            if month <= 0:
+                month += 12
+                year -= 1
+            month_str = f"{year}-{month:02d}"
+            cur.execute("""
+                SELECT COALESCE(SUM(amount_paid), 0) FROM payments 
+                WHERE strftime('%Y-%m', payment_date) = ?
+            """, (month_str,))
+            total = cur.fetchone()[0]
+            labels.append(f"{year}-{month:02d}")
+            revenue_data.append(float(total))
+    
+    cur.close()
+    conn.close()
+    
+    return render_template("management/financial_reports.html",
+                         payment_methods=payment_methods,
+                         labels=labels,
+                         revenue_data=revenue_data,
+                         period=period)
+    
+    
+@app.route('/management/clinical-reports')
+def management_clinical_reports():
+    if 'management_user_id' not in session:
+        return redirect(url_for('management_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Top diagnoses (from consultations)
+    cur.execute("""
+        SELECT diagnosis, COUNT(*) as count
+        FROM consultations
+        WHERE diagnosis IS NOT NULL AND diagnosis != ''
+        GROUP BY diagnosis
+        ORDER BY count DESC
+        LIMIT 10
+    """)
+    top_diagnoses = cur.fetchall()
+    
+    # Monthly consultations
+    cur.execute("""
+        SELECT strftime('%Y-%m', consultation_date) as month, COUNT(*) as count
+        FROM consultations
+        WHERE consultation_date >= date('now', '-12 months')
+        GROUP BY month
+        ORDER BY month DESC
+    """)
+    consultation_trend = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    
+    return render_template("management/clinical_reports.html",
+                         top_diagnoses=top_diagnoses,
+                         consultation_trend=consultation_trend)
+
+@app.route('/management/operational-reports')
+def management_operational_reports():
+    if 'management_user_id' not in session:
+        return redirect(url_for('management_login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Bed occupancy (simplified - can be extended with ward beds)
+    # For now, show active patient services
+    cur.execute("SELECT COUNT(*) FROM patient_services WHERE status='Active'")
+    active_services = cur.fetchone()[0] or 0
+    # Assume total beds = 100 (configurable)
+    total_beds = 100
+    occupancy_rate = (active_services / total_beds * 100) if total_beds > 0 else 0
+    
+    # Average wait times (from queue)
+    cur.execute("SELECT AVG(waiting_time) FROM queue WHERE waiting_time IS NOT NULL")
+    avg_wait = cur.fetchone()[0] or 0
+    
+    cur.close()
+    conn.close()
+    
+    return render_template("management/operational_reports.html",
+                         occupancy_rate=round(occupancy_rate, 1),
+                         active_patients=active_services,
+                         total_beds=total_beds,
+                         avg_wait_time=round(avg_wait, 1))
+
+@app.route('/management/export-data')
+def management_export_data():
+    if 'management_user_id' not in session:
+        return redirect(url_for('management_login'))
+    
+    import csv
+    from io import StringIO
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id, patient_id, first_name, last_name, phone, registration_date FROM patients ORDER BY registration_date DESC")
+    data = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Patient ID', 'First Name', 'Last Name', 'Phone', 'Registration Date'])
+    for row in data:
+        writer.writerow(row)
+    
+    response = make_response(output.getvalue())
+    response.headers['Content-Disposition'] = 'attachment; filename=patients_export.csv'
+    response.headers['Content-type'] = 'text/csv'
+    return response
+
+
+@app.route('/management/logout')
+def management_logout():
+    session.pop('management_user_id', None)
+    session.pop('management_username', None)
+    session.pop('management_full_name', None)
+    session.pop('management_role', None)
+    flash("Logged out successfully", "success")
+    return redirect(url_for('management_login'))
+
+def create_default_users():
+    """Create default users for all modules."""
+    default_users = {
+        "pharmacists": ("pharmacist1", "pharma123"),
+        "billing_users": ("billing1", "billing123"),
+        "lab_users": ("labtech1", "lab123"),
+        "patient_users": ("reception1", "reception123"),
+        "clinical_users": ("doctor1", "doctor123"),
+        "radiology_users": ("radiologist1", "radio123"),
+        "management_users": ("manager1", "manager123")
+    }
+
+    conn = get_db_connection()
+    if not conn:
+        return
+
+    cursor = conn.cursor()
+    for table, (username, password) in default_users.items():
+        hashed_pw = generate_password_hash(password)
+        try:
+            if table == "lab_users":
+                cursor.execute(f"""
+                    INSERT OR REPLACE INTO {table} (username, password, full_name, role)
+                    VALUES (?, ?, ?, ?)
+                """, (username, hashed_pw, 'Lab Technician', 'Lab Technician'))
+            elif table == "patient_users":
+                cursor.execute(f"""
+                    INSERT OR REPLACE INTO {table} (username, password, full_name, role, is_active)
+                    VALUES (?, ?, ?, ?, 1)
+                """, (username, hashed_pw, 'Receptionist', 'Receptionist'))
+            elif table == "clinical_users":
+                cursor.execute(f"""
+                    INSERT OR REPLACE INTO {table} (username, password, full_name, specialization, is_active)
+                    VALUES (?, ?, ?, ?, 1)
+                """, (username, hashed_pw, 'Dr. John Smith', 'General Medicine'))
+            elif table == "radiology_users":
+                cursor.execute(f"""
+                    INSERT OR REPLACE INTO {table} (username, password, full_name, role, is_active)
+                    VALUES (?, ?, ?, ?, 1)
+                """, (username, hashed_pw, 'Radiologist', 'Radiologist'))
+            elif table == "management_users":
+                cursor.execute(f"""
+                    INSERT OR REPLACE INTO {table} (username, password, full_name, role, is_active)
+                    VALUES (?, ?, ?, ?, 1)
+                """, (username, hashed_pw, 'Hospital Manager', 'Manager'))
+            else:
+                cursor.execute(f"""
+                    INSERT OR REPLACE INTO {table} (username, password)
+                    VALUES (?, ?)
+                """, (username, hashed_pw))
+        except Exception as e:
+            app.logger.error(f"Error creating default user {username}: {e}")
+    conn.commit()
+    cursor.close()
+    conn.close()
 
 # Call this function after create_tables() in your main block
 if __name__ == "__main__":
@@ -8262,7 +9492,10 @@ if __name__ == "__main__":
     create_default_hr_data()
     create_sample_lab_tests()
     create_default_clinical_user()
-    update_lab_requests_table()  
+    update_lab_requests_table()
+    create_default_radiology_user()
+    update_imaging_orders_table() 
+    update_imaging_orders_table() 
     update_prescriptions_table()
     add_card_number_column_and_backfill()
     app.run(debug=True)

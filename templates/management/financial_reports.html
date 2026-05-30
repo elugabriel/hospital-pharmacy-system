@@ -1,0 +1,149 @@
+{% extends "management/base.html" %}
+{% block title %}Financial Reports{% endblock %}
+{% block page_title %}Financial Reports{% endblock %}
+{% block content %}
+
+<!-- Period Selector - more compact -->
+<div class="card mb-3">
+    <div class="card-header py-2">
+        <ul class="nav nav-tabs card-header-tabs">
+            <li class="nav-item">
+                <a class="nav-link {% if period == 'daily' %}active{% endif %}" href="{{ url_for('management_financial_reports', period='daily') }}">Daily (Last 7 days)</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if period == 'weekly' %}active{% endif %}" href="{{ url_for('management_financial_reports', period='weekly') }}">Weekly (Last 6 weeks)</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if period == 'monthly' %}active{% endif %}" href="{{ url_for('management_financial_reports', period='monthly') }}">Monthly (Last 12 months)</a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!-- Two columns: chart on left, summary table on right -->
+<div class="row">
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header py-2">Revenue Trend</div>
+            <div class="card-body">
+                <canvas id="revenueChart" height="220"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header py-2">Period Summary</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light">
+                            <tr><th>Period</th><th class="text-end">Amount (₦)</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for i in range(labels|length) %}
+                            <tr>
+                                <td>{{ labels[i] }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(revenue_data[i]) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment methods chart and list - smaller, side by side -->
+<div class="row mt-3">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header py-2">Payment Methods</div>
+            <div class="card-body">
+                <canvas id="paymentChart" height="180"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header py-2">Breakdown</div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    {% for method in payment_methods %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ method.payment_method }}
+                            <strong>₦{{ "{:,.0f}".format(method.total) }}</strong>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Revenue Chart - smaller and cleaner
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ labels|tojson }},
+            datasets: [{
+                label: 'Revenue (₦)',
+                data: {{ revenue_data|tojson }},
+                borderColor: '#1e3c72',
+                backgroundColor: 'rgba(30,60,114,0.05)',
+                borderWidth: 2,
+                pointRadius: 2,
+                pointHoverRadius: 5,
+                tension: 0.2,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } },
+                tooltip: { callbacks: { label: (ctx) => `₦${ctx.raw.toLocaleString()}` } }
+            },
+            scales: {
+                y: { beginAtZero: true, ticks: { callback: (v) => '₦' + v.toLocaleString(), font: { size: 10 } } },
+                x: { ticks: { font: { size: 10 } } }
+            }
+        }
+    });
+
+    // Payment Methods Pie Chart - smaller
+    const paymentCtx = document.getElementById('paymentChart').getContext('2d');
+    new Chart(paymentCtx, {
+        type: 'pie',
+        data: {
+            labels: [{% for p in payment_methods %}'{{ p.payment_method }}',{% endfor %}],
+            datasets: [{
+                data: [{% for p in payment_methods %}{{ p.total }},{% endfor %}],
+                backgroundColor: ['#3498db','#2ecc71','#e74c3c','#f39c12','#9b59b6','#1abc9c']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            let label = context.label || '';
+                            let value = context.raw;
+                            let total = context.dataset.data.reduce((a,b) => a+b, 0);
+                            let percent = ((value / total) * 100).toFixed(1);
+                            return `${label}: ₦${value.toLocaleString()} (${percent}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

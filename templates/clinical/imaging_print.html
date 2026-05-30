@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Imaging Order - {{ order.order_no }}</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; }
+        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #1e3c72; padding-bottom: 10px; }
+        .hospital-name { font-size: 24px; font-weight: bold; color: #1e3c72; }
+        .hospital-address { font-size: 12px; color: #666; }
+        .title { font-size: 18px; font-weight: bold; margin: 20px 0; text-align: center; }
+        .info-row { margin: 10px 0; }
+        .label { font-weight: bold; display: inline-block; width: 180px; }
+        .footer { margin-top: 50px; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #ccc; padding-top: 10px; }
+        @media print {
+            body { margin: 0; padding: 0; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="hospital-name">John-Theresa Spiritan Specialist Hospital</div>
+        <div class="hospital-address">Uvuru, Nsukka, Enugu State | Tel: 080-XXX-XXXX | Email: info@jthospital.org</div>
+    </div>
+    <div class="title">IMAGING / RADIOLOGY ORDER FORM</div>
+    
+    <div class="info-row"><span class="label">Order No:</span> {{ order.order_no }}</div>
+    <div class="info-row"><span class="label">Patient Name:</span> {{ order.patient_name }}</div>
+    <div class="info-row"><span class="label">Date of Order:</span> {{ order.ordered_date }} {{ order.ordered_time }}</div>
+    <div class="info-row"><span class="label">Referring Doctor:</span> Dr. {{ order.doctor_name }}</div>
+    <hr>
+    <div class="info-row"><span class="label">Imaging Study:</span> {{ order.imaging_type }}</div>
+    <div class="info-row"><span class="label">Body Part:</span> {{ order.body_part }}</div>
+    <div class="info-row"><span class="label">Urgency:</span> {{ order.urgency }}</div>
+    <div class="info-row"><span class="label">Clinical Indication:</span><br><div style="margin-left: 190px;">{{ order.clinical_indication or 'Not specified' }}</div></div>
+    {% if order.notes %}
+    <div class="info-row"><span class="label">Additional Notes:</span><br><div style="margin-left: 190px;">{{ order.notes }}</div></div>
+    {% endif %}
+    
+    <div class="footer">This is a computer-generated order. Please bring this form to the Radiology Department.</div>
+    
+    <div class="no-print" style="text-align: center; margin-top: 30px;"><button onclick="window.print();window.close();">Print</button></div>
+</body>
+</html>

@@ -3,80 +3,267 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Billing & Revenue Dashboard</title>
+    <title>Billing Dashboard - All Saint Medical Center</title>
 
-    <!-- Font Awesome -->
-    <link rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-    <!-- Custom CSS -->
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='css/billing_dashboard.css') }}">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3a56d4;
+            --gradient-primary: linear-gradient(135deg, #4361ee 0%, #7209b7 100%);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1);
+            --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1);
+            --border-radius-xl: 24px;
+            --gray-800: #1e293b;
+            --gray-600: #475569;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f1f5f9 0%, #e6ecf5 100%);
+            min-height: 100vh;
+        }
+
+        .topbar {
+            background: var(--gradient-primary);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .user-info h2 { font-size: 1.5rem; font-weight: 700; }
+        .logout-btn {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: 0.3s;
+        }
+        .logout-btn:hover { background: white; color: var(--primary); }
+
+        .page-title {
+            padding: 2rem 2rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .page-title h1 { font-size: 2rem; font-weight: 800; color: var(--gray-800); }
+
+        .quick-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+            padding: 0 2rem 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .stat-item {
+            background: white;
+            border-radius: 20px;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            box-shadow: var(--shadow-lg);
+            transition: transform 0.2s;
+            border: 1px solid #e2e8f0;
+        }
+        .stat-item:hover { transform: translateY(-5px); }
+        .stat-icon {
+            width: 55px;
+            height: 55px;
+            background: rgba(67,97,238,0.1);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: var(--primary);
+        }
+        .stat-content h4 { font-size: 0.9rem; color: var(--gray-600); margin-bottom: 0.25rem; }
+        .stat-content p { font-size: 1.5rem; font-weight: 700; color: var(--gray-800); margin-bottom: 0; }
+        .refresh-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-size: 0.8rem;
+            margin-left: 0.5rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .refresh-btn:hover { transform: rotate(180deg); }
+
+        .dashboard-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            padding: 0 2rem 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .card-link { text-decoration: none; display: block; }
+        .card {
+            background: white;
+            border-radius: 24px;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            transition: all 0.3s;
+            height: 100%;
+        }
+        .card:hover { transform: translateY(-8px); box-shadow: var(--shadow-xl); }
+        .card i {
+            font-size: 3rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+        .card h3 { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--gray-800); }
+        .card p { color: var(--gray-600); }
+
+        footer { text-align: center; padding: 2rem; color: #64748b; }
+
+        @media (max-width: 768px) {
+            .topbar { flex-direction: column; gap: 1rem; text-align: center; }
+            .page-title h1 { font-size: 1.6rem; }
+            .quick-stats, .dashboard-cards { padding: 0 1rem 1rem; }
+        }
+    </style>
 </head>
 <body>
 
-    <!-- ================= TOP BAR ================= -->
-    <header class="topbar">
-        <div class="user-info">
-            <h2>Billing & Revenue</h2>
-            <p>Welcome, {{ session.get('billing_username', 'User') }}</p>
+<header class="topbar">
+    <div class="user-info">
+        <h2><i class="fa-solid fa-hospital"></i> All Saint Medical Center</h2>
+        <p><i class="fa-regular fa-circle-user"></i> Welcome, {{ session.get('billing_username', 'Billing Officer') }}</p>
+    </div>
+    <a href="{{ url_for('billing_logout') }}" class="logout-btn"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+</header>
+
+<section class="page-title">
+    <h1>Billing & Revenue Dashboard</h1>
+</section>
+
+<!-- Quick Stats -->
+<section class="quick-stats">
+    <div class="stat-item">
+        <div class="stat-icon"><i class="fa-solid fa-money-bill-wave"></i></div>
+        <div class="stat-content">
+            <h4>Today's Collections</h4>
+            <p id="todayCollectionAmount">₦0.00</p>
         </div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-icon"><i class="fa-solid fa-clock"></i></div>
+        <div class="stat-content">
+            <h4>Current Time</h4>
+            <p id="currentTime">--:--:--</p>
+        </div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-icon"><i class="fa-solid fa-calendar"></i></div>
+        <div class="stat-content">
+            <h4>Today's Date</h4>
+            <p id="currentDate"></p>
+        </div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-icon"><i class="fa-solid fa-chart-simple"></i></div>
+        <div class="stat-content">
+            <h4>Transactions Today</h4>
+            <p id="todayTransactions">0
+                <button class="refresh-btn" onclick="loadTodayCollection()" title="Refresh now">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+            </p>
+        </div>
+    </div>
+</section>
 
-        <a href="{{ url_for('billing_logout') }}" class="logout-btn">
-            <i class="fa-solid fa-right-from-bracket"></i> Logout
-        </a>
-    </header>
+<!-- Action Cards -->
+<section class="dashboard-cards">
+    <a href="{{ url_for('accept_payment_page') }}" class="card-link">
+        <div class="card">
+            <i class="fa-solid fa-credit-card"></i>
+            <h3>Accept Payment</h3>
+            <p>Process patient payments</p>
+        </div>
+    </a>
+    <a href="{{ url_for('todays_collection') }}" class="card-link">
+        <div class="card">
+            <i class="fa-solid fa-chart-line"></i>
+            <h3>Today's Collection</h3>
+            <p>View detailed today's collections</p>
+        </div>
+    </a>
+    <a href="{{ url_for('payment_history') }}" class="card-link">
+        <div class="card">
+            <i class="fa-solid fa-receipt"></i>
+            <h3>Payment History</h3>
+            <p>Search and filter all transactions</p>
+        </div>
+    </a>
+</section>
 
-    <!-- ================= PAGE TITLE ================= -->
-    <section class="page-title">
-        <h1>Billing & Revenue Dashboard</h1>
-        <span class="badge">Active</span>
-    </section>
+<footer>
+    <p><i class="fa-regular fa-copyright"></i> 2026 All Saint Medical Center. All rights reserved.</p>
+</footer>
 
-    <!-- ================= DASHBOARD CARDS ================= -->
-    <section class="dashboard-cards">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
-        <!-- THIS IS THE IMPORTANT FIX: The link now points to the correct page -->
-        <a href="{{ url_for('accept_payment_page') }}" class="card-link">
-            <div class="card">
-                <i class="fa-solid fa-credit-card"></i>
-                <h3>Accept Payment</h3>
-                <p>Receive patient payments for services</p>
-            </div>
-        </a>
+<script>
+    function formatCurrency(amount) {
+        return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
+    }
 
-        <a href="{{ url_for('todays_collection') }}" class="card-link">
-            <div class="card">
-                <i class="fa-solid fa-money-bill-trend-up"></i>
-                <h3>Today's Collection</h3>
-                <p>Total amount collected today</p>
-            </div>
-        </a>
+    function loadTodayCollection() {
+        fetch('/billing/api/today-collection', {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('todayCollectionAmount').innerHTML = formatCurrency(data.total_collected);
+                document.getElementById('todayTransactions').innerHTML = data.transaction_count || 0;
+            }
+        })
+        .catch(err => console.error('Error loading collection:', err));
+    }
 
-        <!-- <a href="#" class="card-link">
-            <div class="card">
-                <i class="fa-solid fa-chart-line"></i>
-                <h3>Revenue Report</h3>
-                <p>Daily, weekly & monthly reports</p>
-            </div>
-        </a> -->
+    function updateDateTime() {
+        const now = new Date();
+        document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
 
-        <a href="{{ url_for('payment_history') }}" class="card-link">
-            <div class="card">
-                <i class="fa-solid fa-receipt"></i>
-                <h3>Payment History</h3>
-                <p>All completed transactions</p>
-            </div>
-        </a>
-
-        <!-- <a href="#" class="card-link">
-            <div class="card">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <h3>Search Receipt</h3>
-                <p>Find receipt by number or patient</p>
-            </div>
-        </a> -->
-    </section>
-
+    // Load data on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadTodayCollection();
+        updateDateTime();
+        setInterval(updateDateTime, 1000);
+        setInterval(loadTodayCollection, 30000);      // auto-refresh every 30 sec
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) loadTodayCollection();   // refresh when tab becomes visible
+        });
+    });
+</script>
 </body>
 </html>

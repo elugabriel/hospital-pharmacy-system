@@ -1,0 +1,9 @@
+{% extends "management/base.html" %}
+{% block title %}Operational Reports{% endblock %}
+{% block page_title %}Operational Reports{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-md-4"><div class="stat-card"><h3>{{ occupancy_rate }}%</h3><span>Bed Occupancy Rate</span><br><small>{{ active_patients }} / {{ total_beds }} beds</small></div></div>
+    <div class="col-md-4"><div class="stat-card"><h3>{{ avg_wait_time }} min</h3><span>Average Wait Time</span></div></div>
+</div>
+{% endblock %}

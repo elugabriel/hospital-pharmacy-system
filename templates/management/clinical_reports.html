@@ -1,0 +1,13 @@
+{% extends "management/base.html" %}
+{% block title %}Clinical Reports{% endblock %}
+{% block page_title %}Clinical Reports{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-md-6"><div class="card"><div class="card-header">Top Diagnoses</div><div class="card-body"><ul>{% for d in top_diagnoses %}<li>{{ d.diagnosis }}: {{ d.count }} cases</li>{% endfor %}</ul></div></div></div>
+    <div class="col-md-6"><div class="card"><div class="card-header">Consultation Trend</div><div class="card-body"><canvas id="trendChart"></canvas></div></div></div>
+</div>
+<script>
+    const trendCtx = document.getElementById('trendChart').getContext('2d');
+    new Chart(trendCtx, { type: 'bar', data: { labels: [{% for t in consultation_trend %}'{{ t.month }}',{% endfor %}], datasets: [{ label: 'Consultations', data: [{% for t in consultation_trend %}{{ t.count }},{% endfor %}], backgroundColor: '#2ecc71' }] } });
+</script>
+{% endblock %}
